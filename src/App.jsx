@@ -182,7 +182,6 @@ export default function App() {
                 <div style={{ fontWeight: 900, fontSize: 16, letterSpacing: 1 }}>{c.name}</div>
                 <span style={{ fontSize: 11, color: C.mute }}>{c.area}</span>
               </div>
-              <div style={{ fontSize: 12, color: C.pink, marginTop: 3 }}>{c.genre}</div>
               <div style={{ fontSize: 12, color: C.mute, marginTop: 3 }}>{c.members} 位社員・{c.bands} 組樂團</div>
             </div>
           ))}
@@ -245,7 +244,6 @@ export default function App() {
 
       {modal?.type === "club" && (
         <Modal title={modal.data.name} onClose={() => setModal(null)}>
-          <div style={{ fontSize: 13, color: C.pink, marginBottom: 8 }}>{modal.data.genre}・{modal.data.area}</div>
           <p style={{ fontSize: 14, lineHeight: 1.8 }}>{modal.data.intro}</p>
           <div style={{ fontSize: 13, color: C.mute, marginBottom: 16 }}>{modal.data.members} 位社員・{modal.data.bands} 組樂團</div>
           <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 6, padding: "12px 14px", fontFamily: "monospace", fontSize: 14, color: C.amber }}>聯絡方式:{modal.data.contact}</div>
@@ -279,7 +277,6 @@ function NewClubModal({ onClose, onSubmit }) {
     <Modal title="登錄社團" onClose={onClose}>
       <Field label="社團名稱 *" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="例:○○高中 熱音社" />
       <Field label="地區 *" value={f.area} onChange={e => setF({ ...f, area: e.target.value })} placeholder="例:新北市.板橋" />
-      <Field label="主要曲風" value={f.genre} onChange={e => setF({ ...f, genre: e.target.value })} placeholder="例:Rock / Indie" />
       <div style={{ display: "flex", gap: 10 }}>
         <div style={{ flex: 1 }}><Field label="社員數" type="number" value={f.members} onChange={e => setF({ ...f, members: e.target.value })} /></div>
         <div style={{ flex: 1 }}><Field label="樂團數" type="number" value={f.bands} onChange={e => setF({ ...f, bands: e.target.value })} /></div>
