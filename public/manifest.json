@@ -1,0 +1,12 @@
+{
+  "name": "團聚 BandLink",
+  "short_name": "團聚",
+  "description": "雙北高中熱音社互聯平台",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#191216",
+  "theme_color": "#191216",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
