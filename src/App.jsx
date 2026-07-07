@@ -12,6 +12,7 @@ const VENUES = [
   { id: "v1", name: "PIPE Live Music", area: "台北市.中正", cap: 350, price: "NT$18,000 起 / 場", note: "河岸旁場館,音響完整,常接學生聯展,建議 6 週前申請。", tags: ["Live House", "含音控"] },
   { id: "v2", name: "板橋 Corner House", area: "新北市.板橋", cap: 200, price: "NT$12,000 起 / 場", note: "板橋在地 Live House,對高中社團友善,可多校分攤場租合辦。", tags: ["Live House", "學生友善"] },
   { id: "v3", name: "濕地 venue 5F", area: "台北市.中山", cap: 150, price: "NT$9,000 起 / 場", note: "小型展演空間,適合 3–4 團規模的小型聯展或發表會。", tags: ["展演空間"] },
+  ];
 
 /* ── 小元件 ── */
 const Tag = ({ children, tone = "amber" }) => (
