@@ -8,11 +8,6 @@ const C = {
   amber: "#FFB525", pink: "#FF4D6D", paper: "#F2EAE0", mute: "#9C8E95",
 };
 
-const VENUES = [
-  { id: "v1", name: "PIPE Live Music", area: "台北市.中正", cap: 350, price: "NT$18,000 起 / 場", note: "河岸旁場館,音響完整,常接學生聯展,建議 6 週前申請。", tags: ["Live House", "含音控"] },
-  { id: "v2", name: "板橋 Corner House", area: "新北市.板橋", cap: 200, price: "NT$12,000 起 / 場", note: "板橋在地 Live House,對高中社團友善,可多校分攤場租合辦。", tags: ["Live House", "學生友善"] },
-  { id: "v3", name: "濕地 venue 5F", area: "台北市.中山", cap: 150, price: "NT$9,000 起 / 場", note: "小型展演空間,適合 3–4 團規模的小型聯展或發表會。", tags: ["展演空間"] },
-
 /* ── 小元件 ── */
 const Tag = ({ children, tone = "amber" }) => (
   <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: tone === "amber" ? C.amber : C.pink, border: `1px solid ${tone === "amber" ? C.amber : C.pink}`, padding: "2px 8px", borderRadius: 2, whiteSpace: "nowrap" }}>{children}</span>
@@ -86,6 +81,7 @@ const PostCard = ({ p }) => (
 export default function App() {
   const [tab, setTab] = useState("home");
   const [clubs, setClubs] = useState([]);
+  const [venues, setVenues] = useState([]);
   const [posts, setPosts] = useState([]);
   const [events, setEvents] = useState([]);
   const [myApps, setMyApps] = useState([]);
@@ -99,12 +95,13 @@ export default function App() {
     if (!configured) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [c, p, e] = await Promise.all([
+      const [c, p, e, v] = await Promise.all([
         supabase.from("clubs").select("*").order("created_at"),
         supabase.from("posts").select("*").order("created_at", { ascending: false }),
         supabase.from("events").select("*").order("date"),
+        supabase.from("venues").select("*").order("created_at"),
       ]);
-      setClubs(c.data || []); setPosts(p.data || []); setEvents(e.data || []);
+      setClubs(c.data || []); setPosts(p.data || []); setEvents(e.data || []); setVenues(v.data || []);
       const ids = JSON.parse(localStorage.getItem("my-app-ids") || "[]");
       if (ids.length) {
         const { data } = await supabase.from("venue_apps").select("*").in("id", ids).order("created_at", { ascending: false });
@@ -180,8 +177,7 @@ export default function App() {
                 <div style={{ fontWeight: 900, fontSize: 16, letterSpacing: 1 }}>{c.name}</div>
                 <span style={{ fontSize: 11, color: C.mute }}>{c.area}</span>
               </div>
-              <div style={{ fontSize: 12, color: C.pink, marginTop: 3 }}>{c.genre}</div>
-              <div style={{ fontSize: 12, color: C.mute, marginTop: 3 }}>{c.members} 位社員・{c.bands} 組樂團</div>
+              <div style={{ fontSize: 12, color: C.mute, marginTop: 3 }}>{c.members} 位社員</div>
             </div>
           ))}
         </>)}
@@ -198,13 +194,14 @@ export default function App() {
 
         {!loading && tab === "venues" && (<>
           <SectionTitle zh="場地申請" en="VENUES" />
-          {VENUES.map(v => (
+          {venues.length === 0 && <Empty text="尚未有場地資料——管理者可至 Supabase 的 venues 表新增" />}
+          {venues.map(v => (
             <div key={v.id} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, padding: "14px 15px", marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ fontWeight: 900, fontSize: 16 }}>{v.name}</div>
                 <span style={{ fontSize: 11, color: C.mute }}>{v.area}</span>
               </div>
-              <div style={{ display: "flex", gap: 6, margin: "7px 0" }}>{v.tags.map(t => <Tag key={t}>{t}</Tag>)}</div>
+              <div style={{ display: "flex", gap: 6, margin: "7px 0", flexWrap: "wrap" }}>{(v.tags || "").split(",").filter(Boolean).map(t => <Tag key={t}>{t.trim()}</Tag>)}</div>
               <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}>{v.note}</div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
                 <span style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>容納 {v.cap} 人・{v.price}</span>
@@ -243,9 +240,9 @@ export default function App() {
 
       {modal?.type === "club" && (
         <Modal title={modal.data.name} onClose={() => setModal(null)}>
-          <div style={{ fontSize: 13, color: C.pink, marginBottom: 8 }}>{modal.data.genre}・{modal.data.area}</div>
+          <div style={{ fontSize: 13, color: C.pink, marginBottom: 8 }}>{modal.data.area}</div>
           <p style={{ fontSize: 14, lineHeight: 1.8 }}>{modal.data.intro}</p>
-          <div style={{ fontSize: 13, color: C.mute, marginBottom: 16 }}>{modal.data.members} 位社員・{modal.data.bands} 組樂團</div>
+          <div style={{ fontSize: 13, color: C.mute, marginBottom: 16 }}>{modal.data.members} 位社員</div>
           <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 6, padding: "12px 14px", fontFamily: "monospace", fontSize: 14, color: C.amber }}>聯絡方式:{modal.data.contact}</div>
         </Modal>
       )}
@@ -271,20 +268,16 @@ const Empty = ({ text }) => (
 );
 
 function NewClubModal({ onClose, onSubmit }) {
-  const [f, setF] = useState({ name: "", area: "", genre: "", members: "", bands: "", intro: "", contact: "" });
+  const [f, setF] = useState({ name: "", area: "", members: "", intro: "", contact: "" });
   const ok = f.name && f.area && f.contact;
   return (
     <Modal title="登錄社團" onClose={onClose}>
       <Field label="社團名稱 *" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="例:○○高中 熱音社" />
       <Field label="地區 *" value={f.area} onChange={e => setF({ ...f, area: e.target.value })} placeholder="例:新北市.板橋" />
-      <Field label="主要曲風" value={f.genre} onChange={e => setF({ ...f, genre: e.target.value })} placeholder="例:Rock / Indie" />
-      <div style={{ display: "flex", gap: 10 }}>
-        <div style={{ flex: 1 }}><Field label="社員數" type="number" value={f.members} onChange={e => setF({ ...f, members: e.target.value })} /></div>
-        <div style={{ flex: 1 }}><Field label="樂團數" type="number" value={f.bands} onChange={e => setF({ ...f, bands: e.target.value })} /></div>
-      </div>
+      <Field label="社員數" type="number" value={f.members} onChange={e => setF({ ...f, members: e.target.value })} />
       <Field label="社團介紹" rows={3} value={f.intro} onChange={e => setF({ ...f, intro: e.target.value })} />
       <Field label="聯絡方式 *" value={f.contact} onChange={e => setF({ ...f, contact: e.target.value })} placeholder="IG / Email" />
-      <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit({ ...f, members: Number(f.members) || 0, bands: Number(f.bands) || 0 })}>登錄</Btn>
+      <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit({ ...f, members: Number(f.members) || 0 })}>登錄</Btn>
     </Modal>
   );
 }
