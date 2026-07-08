@@ -58,15 +58,41 @@ const CodeField = ({ value, onChange }) => (
 
 const fmtDate = d => (d ? String(d).slice(0, 10).replaceAll("-", "/") : "");
 
+const igHandle = t => { const m = String(t || "").match(/@([A-Za-z0-9._]{2,30})/); return m ? m[1] : null; };
+
+const IgChip = ({ from }) => {
+  const h = igHandle(from);
+  if (!h) return null;
+  return (
+    <a href={`https://www.instagram.com/${h}/`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+      style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#1A1115", background: C.amber, borderRadius: 999, padding: "2px 10px", textDecoration: "none", whiteSpace: "nowrap" }}>
+      ◎ @{h}
+    </a>
+  );
+};
+
+const ContactLine = ({ contact }) => {
+  const h = igHandle(contact);
+  return (
+    <div style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>
+      聯絡:{h
+        ? <a href={`https://www.instagram.com/${h}/`} target="_blank" rel="noreferrer" style={{ color: C.amber, textDecoration: "underline" }}>{contact}</a>
+        : contact}
+    </div>
+  );
+};
+
 const TicketCard = ({ ev, onEdit }) => (
   <div style={{ display: "flex", background: C.card2, borderRadius: 6, overflow: "hidden", marginBottom: 14, border: `1px solid ${C.line}` }}>
     <div style={{ flex: 1, padding: "14px 16px" }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-        <Tag tone={ev.state === "售票中" ? "pink" : "amber"}>{ev.state}</Tag>
         <span style={{ fontFamily: "monospace", fontSize: 11, color: C.mute }}>{fmtDate(ev.date)}・{ev.time}</span>
         {onEdit && <EditBtn onClick={onEdit} />}
       </div>
-      <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: 1, color: C.paper, lineHeight: 1.35 }}>{ev.title}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 17, fontWeight: 900, letterSpacing: 1, color: C.paper, lineHeight: 1.35 }}>{ev.title}</span>
+        <IgChip from={`${ev.host || ""} ${ev.descr || ""}`} />
+      </div>
       <div style={{ fontSize: 13, color: C.amber, margin: "4px 0 6px" }}>{ev.host}</div>
       {ev.descr && <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}>{ev.descr}</div>}
       <div style={{ fontSize: 12, color: C.paper, marginTop: 8 }}>📍 {ev.venue}</div>
@@ -84,9 +110,12 @@ const PostCard = ({ p, onEdit }) => (
       <span style={{ fontSize: 12, color: C.mute }}>{p.club}・{fmtDate(p.created_at)}</span>
       {onEdit && <EditBtn onClick={onEdit} />}
     </div>
-    <div style={{ fontWeight: 900, fontSize: 15, letterSpacing: .5, color: C.paper }}>{p.title}</div>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <span style={{ fontWeight: 900, fontSize: 15, letterSpacing: .5, color: C.paper }}>{p.title}</span>
+      <IgChip from={p.contact} />
+    </div>
     <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.7, margin: "5px 0 8px" }}>{p.body}</div>
-    <div style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>聯絡:{p.contact}</div>
+    <ContactLine contact={p.contact} />
   </div>
 );
 
@@ -202,10 +231,10 @@ export default function App() {
         {!loading && tab === "home" && (<>
           <SectionTitle zh="近期演出" en="UPCOMING SHOWS" />
           {events.length === 0 && <Empty text="還沒有活動——到「辦演出」建立第一場吧" />}
-          {events.map(e => <TicketCard key={e.id} ev={e} onEdit={() => setModal(isMine(e.id) ? { type: "editEvent", data: e } : { type: "blocked", next: { type: "editEvent", data: e } })} />)}
+          {events.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e.id) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
           <SectionTitle zh="最新媒合" en="LATEST POSTS" />
           {posts.length === 0 && <Empty text="還沒有媒合貼文" />}
-          {posts.slice(0, 3).map(p => <PostCard key={p.id} p={p} onEdit={() => setModal(isMine(p.id) ? { type: "editPost", data: p } : { type: "blocked", next: { type: "editPost", data: p } })} />)}
+          {posts.slice(0, 3).map(p => <PostCard key={p.id} p={p} onEdit={isMine(p.id) ? () => setModal({ type: "editPost", data: p }) : undefined} />)}
           <div style={{ textAlign: "center", margin: "6px 0 20px" }}>
             <Btn tone="ghost" onClick={() => setTab("gigs")}>查看全部媒合貼文 →</Btn>
           </div>
@@ -234,7 +263,7 @@ export default function App() {
           </div>
           <p style={{ fontSize: 12, color: C.mute, margin: "0 0 12px" }}>「徵團」= 我辦活動找樂團;「自薦」= 我的團找演出機會。發布後會取得編輯碼,在發布的這台裝置上可隨時修改或刪除。</p>
           {posts.length === 0 && <Empty text="還沒有貼文,發第一篇吧" />}
-          {posts.map(p => <PostCard key={p.id} p={p} onEdit={() => setModal(isMine(p.id) ? { type: "editPost", data: p } : { type: "blocked", next: { type: "editPost", data: p } })} />)}
+          {posts.map(p => <PostCard key={p.id} p={p} onEdit={isMine(p.id) ? () => setModal({ type: "editPost", data: p }) : undefined} />)}
         </>)}
 
         {!loading && tab === "venues" && (<>
@@ -288,8 +317,8 @@ export default function App() {
           <div style={{ fontSize: 13, color: C.pink, marginBottom: 8 }}>{modal.data.area}</div>
           <p style={{ fontSize: 14, lineHeight: 1.8 }}>{modal.data.intro}</p>
           <div style={{ fontSize: 13, color: C.mute, marginBottom: 16 }}>{modal.data.members} 位社員</div>
-          <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 6, padding: "12px 14px", fontFamily: "monospace", fontSize: 14, color: C.amber, marginBottom: 14 }}>聯絡方式:{modal.data.contact}</div>
-          <Btn tone="ghost" style={{ width: "100%" }} onClick={() => setModal(isMine(modal.data.id) ? { type: "editClub", data: modal.data } : { type: "blocked", next: { type: "editClub", data: modal.data } })}>✎ 編輯社團資料(需編輯碼)</Btn>
+          <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 6, padding: "12px 14px", marginBottom: 14 }}><ContactLine contact={modal.data.contact} /></div>
+          {isMine(modal.data.id) && <Btn tone="ghost" style={{ width: "100%" }} onClick={() => setModal({ type: "editClub", data: modal.data })}>✎ 編輯社團資料(需編輯碼)</Btn>}
         </Modal>
       )}
 
@@ -318,15 +347,6 @@ export default function App() {
           <EventForm initial={modal.data} withCode
             onSubmit={(f, code) => rpcWithCode("update_event", { p_id: modal.data.id, p_code: code, p_title: f.title, p_host: f.host, p_date: f.date, p_time: f.time, p_venue: f.venue, p_descr: f.descr }, "活動已更新")}
             onDelete={code => rpcWithCode("delete_event", { p_id: modal.data.id, p_code: code }, "活動已刪除")} />
-        </Modal>
-      )}
-
-      {modal?.type === "blocked" && (
-        <Modal title="此內容由發布者管理" onClose={() => setModal(null)}>
-          <p style={{ fontSize: 14, color: C.paper, lineHeight: 1.9, marginTop: 0 }}>這筆內容只有發布者能修改或刪除。系統偵測到這台裝置不是發布時使用的裝置。</p>
-          <p style={{ fontSize: 13, color: C.mute, lineHeight: 1.8 }}>如果你就是發布者(例如換了手機或電腦),持發布時取得的<b style={{ color: C.amber }}>編輯碼</b>仍可繼續編輯。</p>
-          <Btn style={{ width: "100%", marginBottom: 8 }} onClick={() => setModal(null)}>我知道了</Btn>
-          <Btn tone="ghost" style={{ width: "100%" }} onClick={() => setModal(modal.next)}>我是發布者,輸入編輯碼繼續</Btn>
         </Modal>
       )}
 
