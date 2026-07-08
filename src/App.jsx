@@ -106,6 +106,7 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem("my-items") || "[]"); } catch { return []; }
   });
   const isMine = id => myItems.includes(id);
+  const [codeError, setCodeError] = useState(false);
 
   const ping = msg => { setToast(msg); setTimeout(() => setToast(""), 2600); };
 
@@ -152,7 +153,7 @@ export default function App() {
     try {
       const { data, error } = await supabase.rpc(fn, args);
       if (error) throw error;
-      if (!data) { ping("編輯碼錯誤,請再確認"); return; }
+      if (!data) { setCodeError(true); return; }
       setModal(null); ping(okMsg); reload();
     } catch (err) { console.error(err); ping("操作失敗,請檢查網路後再試"); }
   };
@@ -201,10 +202,10 @@ export default function App() {
         {!loading && tab === "home" && (<>
           <SectionTitle zh="近期演出" en="UPCOMING SHOWS" />
           {events.length === 0 && <Empty text="還沒有活動——到「辦演出」建立第一場吧" />}
-          {events.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e.id) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
+          {events.map(e => <TicketCard key={e.id} ev={e} onEdit={() => setModal(isMine(e.id) ? { type: "editEvent", data: e } : { type: "blocked", next: { type: "editEvent", data: e } })} />)}
           <SectionTitle zh="最新媒合" en="LATEST POSTS" />
           {posts.length === 0 && <Empty text="還沒有媒合貼文" />}
-          {posts.slice(0, 3).map(p => <PostCard key={p.id} p={p} onEdit={isMine(p.id) ? () => setModal({ type: "editPost", data: p }) : undefined} />)}
+          {posts.slice(0, 3).map(p => <PostCard key={p.id} p={p} onEdit={() => setModal(isMine(p.id) ? { type: "editPost", data: p } : { type: "blocked", next: { type: "editPost", data: p } })} />)}
           <div style={{ textAlign: "center", margin: "6px 0 20px" }}>
             <Btn tone="ghost" onClick={() => setTab("gigs")}>查看全部媒合貼文 →</Btn>
           </div>
@@ -233,7 +234,7 @@ export default function App() {
           </div>
           <p style={{ fontSize: 12, color: C.mute, margin: "0 0 12px" }}>「徵團」= 我辦活動找樂團;「自薦」= 我的團找演出機會。發布後會取得編輯碼,在發布的這台裝置上可隨時修改或刪除。</p>
           {posts.length === 0 && <Empty text="還沒有貼文,發第一篇吧" />}
-          {posts.map(p => <PostCard key={p.id} p={p} onEdit={isMine(p.id) ? () => setModal({ type: "editPost", data: p }) : undefined} />)}
+          {posts.map(p => <PostCard key={p.id} p={p} onEdit={() => setModal(isMine(p.id) ? { type: "editPost", data: p } : { type: "blocked", next: { type: "editPost", data: p } })} />)}
         </>)}
 
         {!loading && tab === "venues" && (<>
@@ -288,7 +289,7 @@ export default function App() {
           <p style={{ fontSize: 14, lineHeight: 1.8 }}>{modal.data.intro}</p>
           <div style={{ fontSize: 13, color: C.mute, marginBottom: 16 }}>{modal.data.members} 位社員</div>
           <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 6, padding: "12px 14px", fontFamily: "monospace", fontSize: 14, color: C.amber, marginBottom: 14 }}>聯絡方式:{modal.data.contact}</div>
-          {isMine(modal.data.id) && <Btn tone="ghost" style={{ width: "100%" }} onClick={() => setModal({ type: "editClub", data: modal.data })}>✎ 編輯社團資料(需編輯碼)</Btn>}
+          <Btn tone="ghost" style={{ width: "100%" }} onClick={() => setModal(isMine(modal.data.id) ? { type: "editClub", data: modal.data } : { type: "blocked", next: { type: "editClub", data: modal.data } })}>✎ 編輯社團資料(需編輯碼)</Btn>
         </Modal>
       )}
 
@@ -320,6 +321,15 @@ export default function App() {
         </Modal>
       )}
 
+      {modal?.type === "blocked" && (
+        <Modal title="此內容由發布者管理" onClose={() => setModal(null)}>
+          <p style={{ fontSize: 14, color: C.paper, lineHeight: 1.9, marginTop: 0 }}>這筆內容只有發布者能修改或刪除。系統偵測到這台裝置不是發布時使用的裝置。</p>
+          <p style={{ fontSize: 13, color: C.mute, lineHeight: 1.8 }}>如果你就是發布者(例如換了手機或電腦),持發布時取得的<b style={{ color: C.amber }}>編輯碼</b>仍可繼續編輯。</p>
+          <Btn style={{ width: "100%", marginBottom: 8 }} onClick={() => setModal(null)}>我知道了</Btn>
+          <Btn tone="ghost" style={{ width: "100%" }} onClick={() => setModal(modal.next)}>我是發布者,輸入編輯碼繼續</Btn>
+        </Modal>
+      )}
+
       {modal?.type === "apply" && <ApplyModal venue={modal.data} onClose={() => setModal(null)} onSubmit={f => insert("venue_apps", f, "場地申請已送出", true)} />}
 
       {codeReveal && (
@@ -328,6 +338,17 @@ export default function App() {
           <p style={{ fontSize: 13, color: C.paper, lineHeight: 1.8, marginTop: 0 }}>之後要<b>修改或刪除</b>這筆內容,需要輸入這組編輯碼。<b>請立刻截圖或抄下來</b>——這組碼只會顯示這一次,遺失就無法自行編輯。</p>
           <Btn style={{ width: "100%" }} onClick={() => setCodeReveal(null)}>我已保存編輯碼</Btn>
         </Modal>
+      )}
+
+      {codeError && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(10,6,8,.72)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ width: "100%", maxWidth: 340, background: C.card, border: `2px solid ${C.pink}`, borderRadius: 10, padding: "22px 18px", textAlign: "center" }}>
+            <div style={{ fontSize: 32, color: C.pink, marginBottom: 6 }}>✕</div>
+            <h3 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 900, letterSpacing: 2, color: C.paper }}>編輯碼錯誤</h3>
+            <p style={{ fontSize: 13, color: C.mute, lineHeight: 1.8, margin: "0 0 16px" }}>你輸入的編輯碼與這筆內容不符。請核對發布時取得的那組碼(格式如 A1B2-C3D4,大小寫和前後空格不影響)。</p>
+            <Btn tone="pink" style={{ width: "100%" }} onClick={() => setCodeError(false)}>重新輸入</Btn>
+          </div>
+        </div>
       )}
 
       {toast && <div style={{ position: "fixed", bottom: 84, left: "50%", transform: "translateX(-50%)", background: C.amber, color: "#1A1115", fontWeight: 800, fontSize: 13, padding: "10px 18px", borderRadius: 6, zIndex: 60, whiteSpace: "nowrap" }}>{toast}</div>}
