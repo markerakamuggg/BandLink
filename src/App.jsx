@@ -102,6 +102,10 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
   const [codeReveal, setCodeReveal] = useState(null);
+  const [myItems, setMyItems] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("my-items") || "[]"); } catch { return []; }
+  });
+  const isMine = id => myItems.includes(id);
 
   const ping = msg => { setToast(msg); setTimeout(() => setToast(""), 2600); };
 
@@ -132,7 +136,14 @@ export default function App() {
     try {
       const { data, error } = await supabase.rpc(fn, args);
       if (error) throw error;
-      setModal(null); setCodeReveal(data); reload();
+      const code = typeof data === "string" ? data : data?.code;
+      const id = typeof data === "object" ? data?.id : null;
+      if (id) {
+        const next = [id, ...myItems];
+        setMyItems(next);
+        localStorage.setItem("my-items", JSON.stringify(next));
+      }
+      setModal(null); setCodeReveal(code); reload();
     } catch (err) { console.error(err); ping("送出失敗,請檢查網路後再試"); }
   };
 
@@ -190,10 +201,10 @@ export default function App() {
         {!loading && tab === "home" && (<>
           <SectionTitle zh="近期演出" en="UPCOMING SHOWS" />
           {events.length === 0 && <Empty text="還沒有活動——到「辦演出」建立第一場吧" />}
-          {events.map(e => <TicketCard key={e.id} ev={e} onEdit={() => setModal({ type: "editEvent", data: e })} />)}
+          {events.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e.id) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
           <SectionTitle zh="最新媒合" en="LATEST POSTS" />
           {posts.length === 0 && <Empty text="還沒有媒合貼文" />}
-          {posts.slice(0, 3).map(p => <PostCard key={p.id} p={p} onEdit={() => setModal({ type: "editPost", data: p })} />)}
+          {posts.slice(0, 3).map(p => <PostCard key={p.id} p={p} onEdit={isMine(p.id) ? () => setModal({ type: "editPost", data: p }) : undefined} />)}
           <div style={{ textAlign: "center", margin: "6px 0 20px" }}>
             <Btn tone="ghost" onClick={() => setTab("gigs")}>查看全部媒合貼文 →</Btn>
           </div>
@@ -220,9 +231,9 @@ export default function App() {
             <SectionTitle zh="表演媒合" en="GIG BOARD" />
             <Btn tone="pink" onClick={() => setModal({ type: "newPost" })}>＋ 發布</Btn>
           </div>
-          <p style={{ fontSize: 12, color: C.mute, margin: "0 0 12px" }}>「徵團」= 我辦活動找樂團;「自薦」= 我的團找演出機會。發布後會取得編輯碼,持碼可隨時修改或刪除。</p>
+          <p style={{ fontSize: 12, color: C.mute, margin: "0 0 12px" }}>「徵團」= 我辦活動找樂團;「自薦」= 我的團找演出機會。發布後會取得編輯碼,在發布的這台裝置上可隨時修改或刪除。</p>
           {posts.length === 0 && <Empty text="還沒有貼文,發第一篇吧" />}
-          {posts.map(p => <PostCard key={p.id} p={p} onEdit={() => setModal({ type: "editPost", data: p })} />)}
+          {posts.map(p => <PostCard key={p.id} p={p} onEdit={isMine(p.id) ? () => setModal({ type: "editPost", data: p }) : undefined} />)}
         </>)}
 
         {!loading && tab === "venues" && (<>
@@ -277,7 +288,7 @@ export default function App() {
           <p style={{ fontSize: 14, lineHeight: 1.8 }}>{modal.data.intro}</p>
           <div style={{ fontSize: 13, color: C.mute, marginBottom: 16 }}>{modal.data.members} 位社員</div>
           <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 6, padding: "12px 14px", fontFamily: "monospace", fontSize: 14, color: C.amber, marginBottom: 14 }}>聯絡方式:{modal.data.contact}</div>
-          <Btn tone="ghost" style={{ width: "100%" }} onClick={() => setModal({ type: "editClub", data: modal.data })}>✎ 編輯社團資料(需編輯碼)</Btn>
+          {isMine(modal.data.id) && <Btn tone="ghost" style={{ width: "100%" }} onClick={() => setModal({ type: "editClub", data: modal.data })}>✎ 編輯社團資料(需編輯碼)</Btn>}
         </Modal>
       )}
 
