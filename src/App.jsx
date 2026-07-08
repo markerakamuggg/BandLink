@@ -33,6 +33,10 @@ const Btn = ({ children, tone = "amber", ...props }) => (
   <button {...props} style={{ background: tone === "amber" ? C.amber : tone === "pink" ? C.pink : "transparent", color: tone === "ghost" ? C.mute : "#1A1115", border: tone === "ghost" ? `1px solid ${C.line}` : "none", fontWeight: 800, fontSize: 14, letterSpacing: 1, padding: "10px 18px", borderRadius: 4, cursor: "pointer", fontFamily: "inherit", ...(props.style || {}) }}>{children}</button>
 );
 
+const EditBtn = ({ onClick }) => (
+  <button onClick={e => { e.stopPropagation(); onClick(); }} aria-label="編輯" style={{ marginLeft: "auto", background: "none", border: `1px solid ${C.line}`, color: C.mute, borderRadius: 4, fontSize: 12, padding: "2px 8px", cursor: "pointer", fontFamily: "inherit" }}>✎ 編輯</button>
+);
+
 const Modal = ({ title, onClose, children }) => (
   <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,8,.78)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
     <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, maxHeight: "86vh", overflowY: "auto", background: C.card, borderTop: `3px solid ${C.amber}`, borderRadius: "14px 14px 0 0", padding: "18px 18px 28px" }}>
@@ -45,14 +49,22 @@ const Modal = ({ title, onClose, children }) => (
   </div>
 );
 
+const CodeField = ({ value, onChange }) => (
+  <div style={{ background: C.bg, border: `1px dashed ${C.amber}`, borderRadius: 6, padding: "10px 12px", marginBottom: 14 }}>
+    <div style={{ fontSize: 12, color: C.amber, marginBottom: 6, letterSpacing: 1 }}>編輯碼(發布時系統提供的那組)</div>
+    <input value={value} onChange={onChange} placeholder="例:A1B2-C3D4" style={{ ...inputStyle, fontFamily: "monospace", letterSpacing: 2 }} />
+  </div>
+);
+
 const fmtDate = d => (d ? String(d).slice(0, 10).replaceAll("-", "/") : "");
 
-const TicketCard = ({ ev }) => (
+const TicketCard = ({ ev, onEdit }) => (
   <div style={{ display: "flex", background: C.card2, borderRadius: 6, overflow: "hidden", marginBottom: 14, border: `1px solid ${C.line}` }}>
     <div style={{ flex: 1, padding: "14px 16px" }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
         <Tag tone={ev.state === "售票中" ? "pink" : "amber"}>{ev.state}</Tag>
         <span style={{ fontFamily: "monospace", fontSize: 11, color: C.mute }}>{fmtDate(ev.date)}・{ev.time}</span>
+        {onEdit && <EditBtn onClick={onEdit} />}
       </div>
       <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: 1, color: C.paper, lineHeight: 1.35 }}>{ev.title}</div>
       <div style={{ fontSize: 13, color: C.amber, margin: "4px 0 6px" }}>{ev.host}</div>
@@ -65,11 +77,12 @@ const TicketCard = ({ ev }) => (
   </div>
 );
 
-const PostCard = ({ p }) => (
+const PostCard = ({ p, onEdit }) => (
   <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, padding: "13px 15px", marginBottom: 10 }}>
     <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
       <Tag tone={p.kind === "徵團" ? "pink" : "amber"}>{p.kind}</Tag>
       <span style={{ fontSize: 12, color: C.mute }}>{p.club}・{fmtDate(p.created_at)}</span>
+      {onEdit && <EditBtn onClick={onEdit} />}
     </div>
     <div style={{ fontWeight: 900, fontSize: 15, letterSpacing: .5, color: C.paper }}>{p.title}</div>
     <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.7, margin: "5px 0 8px" }}>{p.body}</div>
@@ -88,8 +101,9 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
+  const [codeReveal, setCodeReveal] = useState(null);
 
-  const ping = msg => { setToast(msg); setTimeout(() => setToast(""), 2400); };
+  const ping = msg => { setToast(msg); setTimeout(() => setToast(""), 2600); };
 
   const reload = async () => {
     if (!configured) { setLoading(false); return; }
@@ -112,6 +126,25 @@ export default function App() {
   };
 
   useEffect(() => { reload(); }, []);
+
+  // 建立:呼叫資料庫函數,回傳編輯碼並顯示
+  const rpcCreate = async (fn, args) => {
+    try {
+      const { data, error } = await supabase.rpc(fn, args);
+      if (error) throw error;
+      setModal(null); setCodeReveal(data); reload();
+    } catch (err) { console.error(err); ping("送出失敗,請檢查網路後再試"); }
+  };
+
+  // 更新/刪除:驗證編輯碼,錯誤時保留視窗讓使用者重試
+  const rpcWithCode = async (fn, args, okMsg) => {
+    try {
+      const { data, error } = await supabase.rpc(fn, args);
+      if (error) throw error;
+      if (!data) { ping("編輯碼錯誤,請再確認"); return; }
+      setModal(null); ping(okMsg); reload();
+    } catch (err) { console.error(err); ping("操作失敗,請檢查網路後再試"); }
+  };
 
   const insert = async (table, row, okMsg, trackMine = false) => {
     try {
@@ -157,10 +190,10 @@ export default function App() {
         {!loading && tab === "home" && (<>
           <SectionTitle zh="近期演出" en="UPCOMING SHOWS" />
           {events.length === 0 && <Empty text="還沒有活動——到「辦演出」建立第一場吧" />}
-          {events.map(e => <TicketCard key={e.id} ev={e} />)}
+          {events.map(e => <TicketCard key={e.id} ev={e} onEdit={() => setModal({ type: "editEvent", data: e })} />)}
           <SectionTitle zh="最新媒合" en="LATEST POSTS" />
           {posts.length === 0 && <Empty text="還沒有媒合貼文" />}
-          {posts.slice(0, 3).map(p => <PostCard key={p.id} p={p} />)}
+          {posts.slice(0, 3).map(p => <PostCard key={p.id} p={p} onEdit={() => setModal({ type: "editPost", data: p })} />)}
           <div style={{ textAlign: "center", margin: "6px 0 20px" }}>
             <Btn tone="ghost" onClick={() => setTab("gigs")}>查看全部媒合貼文 →</Btn>
           </div>
@@ -187,9 +220,9 @@ export default function App() {
             <SectionTitle zh="表演媒合" en="GIG BOARD" />
             <Btn tone="pink" onClick={() => setModal({ type: "newPost" })}>＋ 發布</Btn>
           </div>
-          <p style={{ fontSize: 12, color: C.mute, margin: "0 0 12px" }}>「徵團」= 我辦活動找樂團;「自薦」= 我的團找演出機會。</p>
+          <p style={{ fontSize: 12, color: C.mute, margin: "0 0 12px" }}>「徵團」= 我辦活動找樂團;「自薦」= 我的團找演出機會。發布後會取得編輯碼,持碼可隨時修改或刪除。</p>
           {posts.length === 0 && <Empty text="還沒有貼文,發第一篇吧" />}
-          {posts.map(p => <PostCard key={p.id} p={p} />)}
+          {posts.map(p => <PostCard key={p.id} p={p} onEdit={() => setModal({ type: "editPost", data: p })} />)}
         </>)}
 
         {!loading && tab === "venues" && (<>
@@ -225,8 +258,8 @@ export default function App() {
 
         {!loading && tab === "host" && (<>
           <SectionTitle zh="辦一場演出" en="HOST A SHOW" />
-          <p style={{ fontSize: 13, color: C.mute, lineHeight: 1.8, marginTop: 0 }}>建立活動後會顯示在首頁與跑馬燈。建議流程:確認合辦社團 → 申請場地 → 在媒合板徵團 → 公告活動。</p>
-          <HostForm onSubmit={f => insert("events", f, "活動已建立並公開")} />
+          <p style={{ fontSize: 13, color: C.mute, lineHeight: 1.8, marginTop: 0 }}>建立活動後會顯示在首頁與跑馬燈,並取得編輯碼供日後修改。建議流程:確認合辦社團 → 申請場地 → 在媒合板徵團 → 公告活動。</p>
+          <EventForm onSubmit={f => rpcCreate("create_event", { p_title: f.title, p_host: f.host, p_date: f.date, p_time: f.time, p_venue: f.venue, p_descr: f.descr })} />
         </>)}
       </main>
 
@@ -243,12 +276,48 @@ export default function App() {
           <div style={{ fontSize: 13, color: C.pink, marginBottom: 8 }}>{modal.data.area}</div>
           <p style={{ fontSize: 14, lineHeight: 1.8 }}>{modal.data.intro}</p>
           <div style={{ fontSize: 13, color: C.mute, marginBottom: 16 }}>{modal.data.members} 位社員</div>
-          <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 6, padding: "12px 14px", fontFamily: "monospace", fontSize: 14, color: C.amber }}>聯絡方式:{modal.data.contact}</div>
+          <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 6, padding: "12px 14px", fontFamily: "monospace", fontSize: 14, color: C.amber, marginBottom: 14 }}>聯絡方式:{modal.data.contact}</div>
+          <Btn tone="ghost" style={{ width: "100%" }} onClick={() => setModal({ type: "editClub", data: modal.data })}>✎ 編輯社團資料(需編輯碼)</Btn>
         </Modal>
       )}
-      {modal?.type === "newClub" && <NewClubModal onClose={() => setModal(null)} onSubmit={f => insert("clubs", f, "社團已登錄名錄")} />}
-      {modal?.type === "newPost" && <NewPostModal onClose={() => setModal(null)} onSubmit={f => insert("posts", f, "已發布,所有社團都看得到")} />}
+
+      {modal?.type === "newClub" && (
+        <ClubFormModal onClose={() => setModal(null)}
+          onSubmit={f => rpcCreate("create_club", { p_name: f.name, p_area: f.area, p_members: Number(f.members) || 0, p_intro: f.intro, p_contact: f.contact })} />
+      )}
+      {modal?.type === "editClub" && (
+        <ClubFormModal initial={modal.data} onClose={() => setModal(null)}
+          onSubmit={(f, code) => rpcWithCode("update_club", { p_id: modal.data.id, p_code: code, p_name: f.name, p_area: f.area, p_members: Number(f.members) || 0, p_intro: f.intro, p_contact: f.contact }, "社團資料已更新")}
+          onDelete={code => rpcWithCode("delete_club", { p_id: modal.data.id, p_code: code }, "社團已從名錄移除")} />
+      )}
+
+      {modal?.type === "newPost" && (
+        <PostFormModal onClose={() => setModal(null)}
+          onSubmit={f => rpcCreate("create_post", { p_kind: f.kind, p_club: f.club, p_title: f.title, p_body: f.body, p_contact: f.contact })} />
+      )}
+      {modal?.type === "editPost" && (
+        <PostFormModal initial={modal.data} onClose={() => setModal(null)}
+          onSubmit={(f, code) => rpcWithCode("update_post", { p_id: modal.data.id, p_code: code, p_kind: f.kind, p_club: f.club, p_title: f.title, p_body: f.body, p_contact: f.contact }, "貼文已更新")}
+          onDelete={code => rpcWithCode("delete_post", { p_id: modal.data.id, p_code: code }, "貼文已刪除")} />
+      )}
+
+      {modal?.type === "editEvent" && (
+        <Modal title="編輯活動" onClose={() => setModal(null)}>
+          <EventForm initial={modal.data} withCode
+            onSubmit={(f, code) => rpcWithCode("update_event", { p_id: modal.data.id, p_code: code, p_title: f.title, p_host: f.host, p_date: f.date, p_time: f.time, p_venue: f.venue, p_descr: f.descr }, "活動已更新")}
+            onDelete={code => rpcWithCode("delete_event", { p_id: modal.data.id, p_code: code }, "活動已刪除")} />
+        </Modal>
+      )}
+
       {modal?.type === "apply" && <ApplyModal venue={modal.data} onClose={() => setModal(null)} onSubmit={f => insert("venue_apps", f, "場地申請已送出", true)} />}
+
+      {codeReveal && (
+        <Modal title="發布成功!你的編輯碼" onClose={() => setCodeReveal(null)}>
+          <div style={{ background: C.bg, border: `2px dashed ${C.amber}`, borderRadius: 8, padding: "18px 14px", textAlign: "center", fontFamily: "monospace", fontSize: 28, letterSpacing: 4, color: C.amber, marginBottom: 14 }}>{codeReveal}</div>
+          <p style={{ fontSize: 13, color: C.paper, lineHeight: 1.8, marginTop: 0 }}>之後要<b>修改或刪除</b>這筆內容,需要輸入這組編輯碼。<b>請立刻截圖或抄下來</b>——這組碼只會顯示這一次,遺失就無法自行編輯。</p>
+          <Btn style={{ width: "100%" }} onClick={() => setCodeReveal(null)}>我已保存編輯碼</Btn>
+        </Modal>
+      )}
 
       {toast && <div style={{ position: "fixed", bottom: 84, left: "50%", transform: "translateX(-50%)", background: C.amber, color: "#1A1115", fontWeight: 800, fontSize: 13, padding: "10px 18px", borderRadius: 6, zIndex: 60, whiteSpace: "nowrap" }}>{toast}</div>}
 
@@ -267,26 +336,44 @@ const Empty = ({ text }) => (
   <div style={{ border: `1px dashed ${C.line}`, borderRadius: 6, padding: "22px 16px", textAlign: "center", color: C.mute, fontSize: 13, marginBottom: 12 }}>{text}</div>
 );
 
-function NewClubModal({ onClose, onSubmit }) {
-  const [f, setF] = useState({ name: "", area: "", members: "", intro: "", contact: "" });
-  const ok = f.name && f.area && f.contact;
+const DeleteRow = ({ onDelete, code, label }) => (
+  <button onClick={() => { if (window.confirm(`確定要刪除這筆${label}?此動作無法復原。`)) onDelete(code); }}
+    style={{ width: "100%", marginTop: 10, background: "none", border: `1px solid ${C.pink}`, color: C.pink, borderRadius: 4, padding: "9px 0", fontWeight: 800, fontSize: 13, letterSpacing: 1, cursor: "pointer", fontFamily: "inherit" }}>
+    刪除這筆{label}
+  </button>
+);
+
+function ClubFormModal({ initial, onClose, onSubmit, onDelete }) {
+  const editing = Boolean(initial);
+  const [code, setCode] = useState("");
+  const [f, setF] = useState(initial
+    ? { name: initial.name, area: initial.area, members: String(initial.members ?? ""), intro: initial.intro || "", contact: initial.contact }
+    : { name: "", area: "", members: "", intro: "", contact: "" });
+  const ok = f.name && f.area && f.contact && (!editing || code);
   return (
-    <Modal title="登錄社團" onClose={onClose}>
+    <Modal title={editing ? "編輯社團資料" : "登錄社團"} onClose={onClose}>
+      {editing && <CodeField value={code} onChange={e => setCode(e.target.value)} />}
       <Field label="社團名稱 *" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="例:○○高中 熱音社" />
       <Field label="地區 *" value={f.area} onChange={e => setF({ ...f, area: e.target.value })} placeholder="例:新北市.板橋" />
       <Field label="社員數" type="number" value={f.members} onChange={e => setF({ ...f, members: e.target.value })} />
       <Field label="社團介紹" rows={3} value={f.intro} onChange={e => setF({ ...f, intro: e.target.value })} />
       <Field label="聯絡方式 *" value={f.contact} onChange={e => setF({ ...f, contact: e.target.value })} placeholder="IG / Email" />
-      <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit({ ...f, members: Number(f.members) || 0 })}>登錄</Btn>
+      <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit(f, code)}>{editing ? "儲存變更" : "登錄"}</Btn>
+      {editing && <DeleteRow onDelete={onDelete} code={code} label="社團" />}
     </Modal>
   );
 }
 
-function NewPostModal({ onClose, onSubmit }) {
-  const [f, setF] = useState({ kind: "徵團", club: "", title: "", body: "", contact: "" });
-  const ok = f.club && f.title && f.body && f.contact;
+function PostFormModal({ initial, onClose, onSubmit, onDelete }) {
+  const editing = Boolean(initial);
+  const [code, setCode] = useState("");
+  const [f, setF] = useState(initial
+    ? { kind: initial.kind, club: initial.club, title: initial.title, body: initial.body, contact: initial.contact }
+    : { kind: "徵團", club: "", title: "", body: "", contact: "" });
+  const ok = f.club && f.title && f.body && f.contact && (!editing || code);
   return (
-    <Modal title="發布媒合貼文" onClose={onClose}>
+    <Modal title={editing ? "編輯媒合貼文" : "發布媒合貼文"} onClose={onClose}>
+      {editing && <CodeField value={code} onChange={e => setCode(e.target.value)} />}
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {["徵團", "自薦"].map(k => (
           <button key={k} onClick={() => setF({ ...f, kind: k })} style={{ flex: 1, padding: "10px 0", borderRadius: 4, cursor: "pointer", fontFamily: "inherit", fontWeight: 800, letterSpacing: 2, fontSize: 14, background: f.kind === k ? (k === "徵團" ? C.pink : C.amber) : "transparent", color: f.kind === k ? "#1A1115" : C.mute, border: f.kind === k ? "none" : `1px solid ${C.line}` }}>{k}</button>
@@ -296,8 +383,33 @@ function NewPostModal({ onClose, onSubmit }) {
       <Field label="標題 *" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="一句話說明需求" />
       <Field label="內容 *" rows={4} value={f.body} onChange={e => setF({ ...f, body: e.target.value })} placeholder="時間、地點、曲風、時段長度、設備等" />
       <Field label="聯絡方式 *" value={f.contact} onChange={e => setF({ ...f, contact: e.target.value })} placeholder="IG / Email" />
-      <Btn tone="pink" disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit(f)}>發布貼文</Btn>
+      <Btn tone="pink" disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit(f, code)}>{editing ? "儲存變更" : "發布貼文"}</Btn>
+      {editing && <DeleteRow onDelete={onDelete} code={code} label="貼文" />}
     </Modal>
+  );
+}
+
+function EventForm({ initial, withCode, onSubmit, onDelete }) {
+  const editing = Boolean(initial);
+  const [code, setCode] = useState("");
+  const [f, setF] = useState(initial
+    ? { title: initial.title, host: initial.host, date: String(initial.date || "").slice(0, 10), time: initial.time || "", venue: initial.venue, descr: initial.descr || "" }
+    : { title: "", host: "", date: "", time: "", venue: "", descr: "" });
+  const ok = f.title && f.host && f.date && f.venue && (!withCode || code);
+  return (
+    <div style={{ background: editing ? "transparent" : C.card, border: editing ? "none" : `1px solid ${C.line}`, borderRadius: 6, padding: editing ? 0 : "16px 15px" }}>
+      {withCode && <CodeField value={code} onChange={e => setCode(e.target.value)} />}
+      <Field label="活動名稱 *" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} />
+      <Field label="主辦單位 *" value={f.host} onChange={e => setF({ ...f, host: e.target.value })} placeholder="例:薇閣 × 明德" />
+      <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ flex: 1 }}><Field label="日期 *" type="date" value={f.date} onChange={e => setF({ ...f, date: e.target.value })} /></div>
+        <div style={{ flex: 1 }}><Field label="時間" type="time" value={f.time} onChange={e => setF({ ...f, time: e.target.value })} /></div>
+      </div>
+      <Field label="場地 *" value={f.venue} onChange={e => setF({ ...f, venue: e.target.value })} />
+      <Field label="活動說明" rows={3} value={f.descr} onChange={e => setF({ ...f, descr: e.target.value })} />
+      <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit(f, code)}>{editing ? "儲存變更" : "建立活動"}</Btn>
+      {editing && <DeleteRow onDelete={onDelete} code={code} label="活動" />}
+    </div>
   );
 }
 
@@ -314,23 +426,5 @@ function ApplyModal({ venue, onClose, onSubmit }) {
       <Field label="備註" rows={3} value={f.note} onChange={e => setF({ ...f, note: e.target.value })} />
       <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit({ ...f, venue: venue.name })}>送出申請</Btn>
     </Modal>
-  );
-}
-
-function HostForm({ onSubmit }) {
-  const [f, setF] = useState({ title: "", host: "", date: "", time: "", venue: "", descr: "" });
-  const ok = f.title && f.host && f.date && f.venue;
-  return (
-    <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, padding: "16px 15px" }}>
-      <Field label="活動名稱 *" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} />
-      <Field label="主辦單位 *" value={f.host} onChange={e => setF({ ...f, host: e.target.value })} placeholder="例:薇閣 × 明德" />
-      <div style={{ display: "flex", gap: 10 }}>
-        <div style={{ flex: 1 }}><Field label="日期 *" type="date" value={f.date} onChange={e => setF({ ...f, date: e.target.value })} /></div>
-        <div style={{ flex: 1 }}><Field label="時間" type="time" value={f.time} onChange={e => setF({ ...f, time: e.target.value })} /></div>
-      </div>
-      <Field label="場地 *" value={f.venue} onChange={e => setF({ ...f, venue: e.target.value })} />
-      <Field label="活動說明" rows={3} value={f.descr} onChange={e => setF({ ...f, descr: e.target.value })} />
-      <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit(f)}>建立活動</Btn>
-    </div>
   );
 }
