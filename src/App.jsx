@@ -91,11 +91,12 @@ const TicketCard = ({ ev, onEdit }) => (
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <span style={{ fontSize: 17, fontWeight: 900, letterSpacing: 1, color: C.paper, lineHeight: 1.35 }}>{ev.title}</span>
-        <IgChip from={`${ev.host || ""} ${ev.descr || ""}`} />
+        <IgChip from={`${ev.contact || ""} ${ev.host || ""} ${ev.descr || ""}`} />
       </div>
       <div style={{ fontSize: 13, color: C.amber, margin: "4px 0 6px" }}>{ev.host}</div>
       {ev.descr && <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}>{ev.descr}</div>}
       <div style={{ fontSize: 12, color: C.paper, marginTop: 8 }}>📍 {ev.venue}</div>
+      {ev.contact && <div style={{ marginTop: 6 }}><ContactLine contact={ev.contact} /></div>}
     </div>
     <div style={{ width: 56, borderLeft: `2px dashed ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", background: C.card }}>
       <span style={{ writingMode: "vertical-rl", fontFamily: "monospace", fontSize: 11, letterSpacing: 3, color: C.mute }}>ADMIT ONE</span>
@@ -247,9 +248,12 @@ export default function App() {
           </div>
           {clubs.map(c => (
             <div key={c.id} onClick={() => setModal({ type: "club", data: c })} style={{ background: C.card, border: `1px solid ${C.line}`, borderLeft: `3px solid ${C.amber}`, borderRadius: 6, padding: "13px 15px", marginBottom: 10, cursor: "pointer" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontWeight: 900, fontSize: 16, letterSpacing: 1 }}>{c.name}</div>
-                <span style={{ fontSize: 11, color: C.mute }}>{c.area}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 900, fontSize: 16, letterSpacing: 1 }}>{c.name}</span>
+                  <IgChip from={c.contact} />
+                </div>
+                <span style={{ fontSize: 11, color: C.mute, whiteSpace: "nowrap" }}>{c.area}</span>
               </div>
               <div style={{ fontSize: 12, color: C.mute, marginTop: 3 }}>{c.members} 位社員</div>
             </div>
@@ -300,7 +304,7 @@ export default function App() {
         {!loading && tab === "host" && (<>
           <SectionTitle zh="辦一場演出" en="HOST A SHOW" />
           <p style={{ fontSize: 13, color: C.mute, lineHeight: 1.8, marginTop: 0 }}>建立活動後會顯示在首頁與跑馬燈,並取得編輯碼供日後修改。建議流程:確認合辦社團 → 申請場地 → 在媒合板徵團 → 公告活動。</p>
-          <EventForm onSubmit={f => rpcCreate("create_event", { p_title: f.title, p_host: f.host, p_date: f.date, p_time: f.time, p_venue: f.venue, p_descr: f.descr })} />
+          <EventForm onSubmit={f => rpcCreate("create_event", { p_title: f.title, p_host: f.host, p_date: f.date, p_time: f.time, p_venue: f.venue, p_descr: f.descr, p_contact: f.contact })} />
         </>)}
       </main>
 
@@ -345,7 +349,7 @@ export default function App() {
       {modal?.type === "editEvent" && (
         <Modal title="編輯活動" onClose={() => setModal(null)}>
           <EventForm initial={modal.data} withCode
-            onSubmit={(f, code) => rpcWithCode("update_event", { p_id: modal.data.id, p_code: code, p_title: f.title, p_host: f.host, p_date: f.date, p_time: f.time, p_venue: f.venue, p_descr: f.descr }, "活動已更新")}
+            onSubmit={(f, code) => rpcWithCode("update_event", { p_id: modal.data.id, p_code: code, p_title: f.title, p_host: f.host, p_date: f.date, p_time: f.time, p_venue: f.venue, p_descr: f.descr, p_contact: f.contact }, "活動已更新")}
             onDelete={code => rpcWithCode("delete_event", { p_id: modal.data.id, p_code: code }, "活動已刪除")} />
         </Modal>
       )}
@@ -445,8 +449,8 @@ function EventForm({ initial, withCode, onSubmit, onDelete }) {
   const editing = Boolean(initial);
   const [code, setCode] = useState("");
   const [f, setF] = useState(initial
-    ? { title: initial.title, host: initial.host, date: String(initial.date || "").slice(0, 10), time: initial.time || "", venue: initial.venue, descr: initial.descr || "" }
-    : { title: "", host: "", date: "", time: "", venue: "", descr: "" });
+    ? { title: initial.title, host: initial.host, date: String(initial.date || "").slice(0, 10), time: initial.time || "", venue: initial.venue, descr: initial.descr || "", contact: initial.contact || "" }
+    : { title: "", host: "", date: "", time: "", venue: "", descr: "", contact: "" });
   const ok = f.title && f.host && f.date && f.venue && (!withCode || code);
   return (
     <div style={{ background: editing ? "transparent" : C.card, border: editing ? "none" : `1px solid ${C.line}`, borderRadius: 6, padding: editing ? 0 : "16px 15px" }}>
@@ -458,6 +462,7 @@ function EventForm({ initial, withCode, onSubmit, onDelete }) {
         <div style={{ flex: 1 }}><Field label="時間" type="time" value={f.time} onChange={e => setF({ ...f, time: e.target.value })} /></div>
       </div>
       <Field label="場地 *" value={f.venue} onChange={e => setF({ ...f, venue: e.target.value })} />
+      <Field label="聯絡方式" value={f.contact} onChange={e => setF({ ...f, contact: e.target.value })} placeholder="IG / Email(填 @帳號 會變成可點的連結)" />
       <Field label="活動說明" rows={3} value={f.descr} onChange={e => setF({ ...f, descr: e.target.value })} />
       <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit(f, code)}>{editing ? "儲存變更" : "建立活動"}</Btn>
       {editing && <DeleteRow onDelete={onDelete} code={code} label="活動" />}
