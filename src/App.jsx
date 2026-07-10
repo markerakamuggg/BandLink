@@ -8,6 +8,12 @@ const C = {
   amber: "#FFB525", pink: "#FF4D6D", paper: "#F2EAE0", mute: "#9C8E95",
 };
 
+const SUB_TAGS = ["主唱", "吉他", "貝斯", "鼓", "鍵盤", "其他"];
+const TAG_COLOR = {
+  全部: "#9C8E95", 主唱: "#FF4D6D", 吉他: "#4D9FFF", 貝斯: "#FFB525",
+  鼓: "#B266FF", 鍵盤: "#4DDB8C", 其他: "#F2EAE0",
+};
+
 /* ── 小元件 ── */
 const Tag = ({ children, tone = "amber" }) => (
   <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: tone === "amber" ? C.amber : C.pink, border: `1px solid ${tone === "amber" ? C.amber : C.pink}`, padding: "2px 8px", borderRadius: 2, whiteSpace: "nowrap" }}>{children}</span>
@@ -33,6 +39,18 @@ const Btn = ({ children, tone = "amber", ...props }) => (
   <button {...props} style={{ background: tone === "amber" ? C.amber : tone === "pink" ? C.pink : "transparent", color: tone === "ghost" ? C.mute : "#1A1115", border: tone === "ghost" ? `1px solid ${C.line}` : "none", fontWeight: 800, fontSize: 14, letterSpacing: 1, padding: "10px 18px", borderRadius: 4, cursor: "pointer", fontFamily: "inherit", ...(props.style || {}) }}>{children}</button>
 );
 
+const TagChip = ({ tag, active, onClick }) => {
+  const color = TAG_COLOR[tag] || C.mute;
+  return (
+    <button type="button" onClick={onClick} disabled={!onClick} style={{
+      fontSize: 11, fontWeight: 800, letterSpacing: .5, fontFamily: "inherit",
+      color: active ? "#1A1115" : color, background: active ? color : "transparent",
+      border: `1px solid ${color}`, borderRadius: 999, padding: "3px 10px",
+      cursor: onClick ? "pointer" : "default", whiteSpace: "nowrap",
+    }}>#{tag}</button>
+  );
+};
+
 const EditBtn = ({ onClick }) => (
   <button onClick={e => { e.stopPropagation(); onClick(); }} aria-label="編輯" style={{ marginLeft: "auto", background: "none", border: `1px solid ${C.line}`, color: C.mute, borderRadius: 4, fontSize: 12, padding: "2px 8px", cursor: "pointer", fontFamily: "inherit" }}>✎ 編輯</button>
 );
@@ -50,6 +68,13 @@ const Modal = ({ title, onClose, children }) => (
 );
 
 const fmtDate = d => (d ? String(d).slice(0, 10).replaceAll("-", "/") : "");
+
+const fmtDateTime = d => {
+  if (!d) return "";
+  const dt = new Date(d);
+  const p = n => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}/${p(dt.getMonth() + 1)}/${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+};
 
 const igHandle = t => { const m = String(t || "").match(/@([A-Za-z0-9._]{2,30})/); return m ? m[1] : null; };
 
@@ -97,21 +122,30 @@ const TicketCard = ({ ev, onEdit }) => (
   </div>
 );
 
-const PostCard = ({ p, onEdit }) => (
-  <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, padding: "13px 15px", marginBottom: 10 }}>
-    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-      <Tag tone={p.kind === "徵團" ? "pink" : "amber"}>{p.kind}</Tag>
-      <span style={{ fontSize: 12, color: C.mute }}>{p.club}・{fmtDate(p.created_at)}</span>
-      {onEdit && <EditBtn onClick={onEdit} />}
+const SubCard = ({ s, onEdit }) => {
+  const expired = s.expires_at && new Date(s.expires_at) < new Date();
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, padding: "13px 15px", marginBottom: 10, opacity: expired ? .55 : 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <span style={{ fontWeight: 900, fontSize: 16, letterSpacing: .5, color: C.paper }}>{s.song}</span>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {(s.tags || []).map(t => <TagChip key={t} tag={t} active />)}
+        </div>
+      </div>
+      <div style={{ fontSize: 12, color: C.amber, margin: "6px 0 2px", lineHeight: 1.6 }}>成發資訊:{s.event_name}・{s.event_time_place}{s.event_clubs ? `・${s.event_clubs}` : ""}</div>
+      {s.note && <div style={{ fontSize: 12, color: C.mute, margin: "2px 0", lineHeight: 1.6 }}>備註:{s.note}</div>}
+      <div style={{ marginTop: 4 }}><ContactLine contact={s.contact} /></div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          {s.filled && <Tag tone="pink">已徵到人</Tag>}
+          {expired && <Tag tone="amber">已過期</Tag>}
+          {onEdit && <EditBtn onClick={onEdit} />}
+        </div>
+        <span style={{ fontFamily: "monospace", fontSize: 10, color: C.mute, whiteSpace: "nowrap" }}>{fmtDateTime(s.created_at)} 發布</span>
+      </div>
     </div>
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-      <span style={{ fontWeight: 900, fontSize: 15, letterSpacing: .5, color: C.paper }}>{p.title}</span>
-      <IgChip from={p.contact} />
-    </div>
-    <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.7, margin: "5px 0 8px" }}>{p.body}</div>
-    <ContactLine contact={p.contact} />
-  </div>
-);
+  );
+};
 
 /* ── 主程式 ── */
 export default function App() {
@@ -119,8 +153,9 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [clubs, setClubs] = useState([]);
   const [venues, setVenues] = useState([]);
-  const [posts, setPosts] = useState([]);
   const [events, setEvents] = useState([]);
+  const [subs, setSubs] = useState([]);
+  const [subFilter, setSubFilter] = useState("全部");
   const [myApps, setMyApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
@@ -151,13 +186,13 @@ export default function App() {
     if (!configured) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [c, p, e, v] = await Promise.all([
+      const [c, e, v, s] = await Promise.all([
         supabase.from("clubs").select("*").order("created_at"),
-        supabase.from("posts").select("*").order("created_at", { ascending: false }),
         supabase.from("events").select("*").order("date"),
         supabase.from("venues").select("*").order("created_at"),
+        supabase.from("subs").select("*").order("created_at", { ascending: false }),
       ]);
-      setClubs(c.data || []); setPosts(p.data || []); setEvents(e.data || []); setVenues(v.data || []);
+      setClubs(c.data || []); setEvents(e.data || []); setVenues(v.data || []); setSubs(s.data || []);
       const ids = JSON.parse(localStorage.getItem("my-app-ids") || "[]");
       if (ids.length) {
         const { data } = await supabase.from("venue_apps").select("*").in("id", ids).order("created_at", { ascending: false });
@@ -253,11 +288,11 @@ export default function App() {
           <SectionTitle zh="近期演出" en="UPCOMING SHOWS" />
           {events.length === 0 && <Empty text="還沒有活動——到「辦演出」建立第一場吧" />}
           {events.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
-          <SectionTitle zh="最新媒合" en="LATEST POSTS" />
-          {posts.length === 0 && <Empty text="還沒有媒合貼文" />}
-          {posts.slice(0, 3).map(p => <PostCard key={p.id} p={p} onEdit={isMine(p) ? () => setModal({ type: "editPost", data: p }) : undefined} />)}
+          <SectionTitle zh="最新徵代打" en="LATEST SUBS" />
+          {subs.length === 0 && <Empty text="還沒有徵代打貼文" />}
+          {subs.slice(0, 3).map(s => <SubCard key={s.id} s={s} onEdit={isMine(s) ? () => setModal({ type: "editSub", data: s }) : undefined} />)}
           <div style={{ textAlign: "center", margin: "6px 0 20px" }}>
-            <Btn tone="ghost" onClick={() => setTab("gigs")}>查看全部媒合貼文 →</Btn>
+            <Btn tone="ghost" onClick={() => setTab("subs")}>查看全部徵代打貼文 →</Btn>
           </div>
         </>)}
 
@@ -279,15 +314,24 @@ export default function App() {
           ))}
         </>)}
 
-        {!loading && tab === "gigs" && (<>
+        {!loading && tab === "subs" && (<>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <SectionTitle zh="表演媒合" en="GIG BOARD" />
-            <Btn tone="pink" onClick={() => requireLogin({ type: "newPost" })}>＋ 發布</Btn>
+            <SectionTitle zh="徵代打" en="SUB BOARD" />
+            <Btn tone="pink" onClick={() => requireLogin({ type: "newSub" })}>＋ 發佈</Btn>
           </div>
-          <p style={{ fontSize: 12, color: C.mute, margin: "0 0 6px" }}>「徵團」= 我辦活動找樂團;「自薦」= 我的團找演出機會。發布需登入,內容綁定你的帳號,任何裝置登入都能編輯。</p>
+          <p style={{ fontSize: 12, color: C.mute, margin: "0 0 10px" }}>找人代打演出時段。發布需登入,內容綁定你的帳號,任何裝置登入都能編輯。</p>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "0 0 14px" }}>
+            {["全部", ...SUB_TAGS].map(t => (
+              <TagChip key={t} tag={t} active={subFilter === t} onClick={() => setSubFilter(t)} />
+            ))}
+          </div>
           <button onClick={() => requireLogin({ type: "claim" })} style={{ background: "none", border: "none", color: C.amber, fontSize: 12, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", padding: 0, margin: "0 0 12px" }}>以前用編輯碼發過內容?登入後在這裡認領 →</button>
-          {posts.length === 0 && <Empty text="還沒有貼文,發第一篇吧" />}
-          {posts.map(p => <PostCard key={p.id} p={p} onEdit={isMine(p) ? () => setModal({ type: "editPost", data: p }) : undefined} />)}
+          {(() => {
+            const list = subFilter === "全部" ? subs : subs.filter(s => (s.tags || []).includes(subFilter));
+            return list.length === 0
+              ? <Empty text="還沒有徵代打貼文,發第一篇吧" />
+              : list.map(s => <SubCard key={s.id} s={s} onEdit={isMine(s) ? () => setModal({ type: "editSub", data: s }) : undefined} />);
+          })()}
         </>)}
 
         {!loading && tab === "venues" && (<>
@@ -331,7 +375,7 @@ export default function App() {
       </main>
 
       <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40, background: "#120C10", borderTop: `1px solid ${C.line}`, display: "flex", justifyContent: "space-around", padding: "8px 4px calc(8px + env(safe-area-inset-bottom))" }}>
-        {[["home", "首頁", "⌂"], ["clubs", "社團", "♫"], ["gigs", "媒合", "⇄"], ["host", "辦演出", "★"], ["venues", "場地", "▣"]].map(([k, label, icon]) => (
+        {[["home", "首頁", "⌂"], ["clubs", "社團", "♫"], ["subs", "代打", "⇄"], ["host", "辦演出", "★"], ["venues", "場地", "▣"]].map(([k, label, icon]) => (
           <button key={k} onClick={() => setTab(k)} style={{ background: "none", border: "none", cursor: "pointer", color: tab === k ? C.amber : C.mute, fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, fontSize: 11, letterSpacing: 1 }}>
             <span style={{ fontSize: 17 }}>{icon}</span>{label}
           </button>
@@ -357,14 +401,14 @@ export default function App() {
           onDelete={() => remove("clubs", modal.data.id, "社團已從名錄移除")} />
       )}
 
-      {modal?.type === "newPost" && (
-        <PostFormModal onClose={() => setModal(null)}
-          onSubmit={f => create("posts", f, "已發布,所有人都看得到")} />
+      {modal?.type === "newSub" && (
+        <SubFormModal onClose={() => setModal(null)}
+          onSubmit={f => create("subs", f, "已發佈徵代打貼文")} />
       )}
-      {modal?.type === "editPost" && (
-        <PostFormModal initial={modal.data} onClose={() => setModal(null)}
-          onSubmit={f => update("posts", modal.data.id, f, "貼文已更新")}
-          onDelete={() => remove("posts", modal.data.id, "貼文已刪除")} />
+      {modal?.type === "editSub" && (
+        <SubFormModal initial={modal.data} onClose={() => setModal(null)}
+          onSubmit={f => update("subs", modal.data.id, f, "貼文已更新")}
+          onDelete={() => remove("subs", modal.data.id, "貼文已刪除")} />
       )}
 
       {modal?.type === "editEvent" && (
@@ -440,24 +484,38 @@ function ClubFormModal({ initial, onClose, onSubmit, onDelete }) {
   );
 }
 
-function PostFormModal({ initial, onClose, onSubmit, onDelete }) {
+function SubFormModal({ initial, onClose, onSubmit, onDelete }) {
   const editing = Boolean(initial);
   const [f, setF] = useState(initial
-    ? { kind: initial.kind, club: initial.club, title: initial.title, body: initial.body, contact: initial.contact }
-    : { kind: "徵團", club: "", title: "", body: "", contact: "" });
-  const ok = f.club && f.title && f.body && f.contact;
+    ? { song: initial.song, tags: initial.tags || [], event_name: initial.event_name, event_time_place: initial.event_time_place, event_clubs: initial.event_clubs || "", note: initial.note || "", contact: initial.contact, filled: initial.filled, expires_at: initial.expires_at ? String(initial.expires_at).slice(0, 16) : "" }
+    : { song: "", tags: [], event_name: "", event_time_place: "", event_clubs: "", note: "", contact: "", filled: false, expires_at: "" });
+  const toggleTag = t => setF(f => ({ ...f, tags: f.tags.includes(t) ? f.tags.filter(x => x !== t) : [...f.tags, t] }));
+  const ok = f.song && f.tags.length > 0 && f.event_name && f.event_time_place && f.contact;
   return (
-    <Modal title={editing ? "編輯媒合貼文" : "發布媒合貼文"} onClose={onClose}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        {["徵團", "自薦"].map(k => (
-          <button key={k} onClick={() => setF({ ...f, kind: k })} style={{ flex: 1, padding: "10px 0", borderRadius: 4, cursor: "pointer", fontFamily: "inherit", fontWeight: 800, letterSpacing: 2, fontSize: 14, background: f.kind === k ? (k === "徵團" ? C.pink : C.amber) : "transparent", color: f.kind === k ? "#1A1115" : C.mute, border: f.kind === k ? "none" : `1px solid ${C.line}` }}>{k}</button>
-        ))}
+    <Modal title={editing ? "編輯徵代打貼文" : "發佈徵代打"} onClose={onClose}>
+      <Field label="歌曲 *" value={f.song} onChange={e => setF({ ...f, song: e.target.value })} placeholder="這個時段要代打的曲目" />
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: C.mute, marginBottom: 4, letterSpacing: 1 }}>標籤(可複選)*</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {SUB_TAGS.map(t => <TagChip key={t} tag={t} active={f.tags.includes(t)} onClick={() => toggleTag(t)} />)}
+        </div>
       </div>
-      <Field label="社團名稱 *" value={f.club} onChange={e => setF({ ...f, club: e.target.value })} />
-      <Field label="標題 *" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="一句話說明需求" />
-      <Field label="內容 *" rows={4} value={f.body} onChange={e => setF({ ...f, body: e.target.value })} placeholder="時間、地點、曲風、時段長度、設備等" />
+      <Field label="成發名稱 *" value={f.event_name} onChange={e => setF({ ...f, event_name: e.target.value })} />
+      <Field label="時間地點 *" value={f.event_time_place} onChange={e => setF({ ...f, event_time_place: e.target.value })} placeholder="例:8/23 12:30 西門河岸留言" />
+      <Field label="參加的社團" value={f.event_clubs} onChange={e => setF({ ...f, event_clubs: e.target.value })} />
+      <Field label="備註" rows={2} value={f.note} onChange={e => setF({ ...f, note: e.target.value })} />
       <Field label="聯絡方式 *" value={f.contact} onChange={e => setF({ ...f, contact: e.target.value })} placeholder="IG / Email(填 @帳號 會變成可點的連結)" />
-      <Btn tone="pink" disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit(f)}>{editing ? "儲存變更" : "發布貼文"}</Btn>
+      <Field label="報名截止時間(選填)" type="datetime-local" value={f.expires_at} onChange={e => setF({ ...f, expires_at: e.target.value })} />
+      {editing && (
+        <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "2px 0 16px", fontSize: 13, color: C.paper, cursor: "pointer" }}>
+          <input type="checkbox" checked={f.filled} onChange={e => setF({ ...f, filled: e.target.checked })} />
+          已徵到人
+        </label>
+      )}
+      <Btn tone="pink" disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }}
+        onClick={() => ok && onSubmit({ ...f, expires_at: f.expires_at ? new Date(f.expires_at).toISOString() : null })}>
+        {editing ? "儲存變更" : "發佈"}
+      </Btn>
       {editing && <DeleteRow onDelete={onDelete} label="貼文" />}
     </Modal>
   );
