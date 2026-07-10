@@ -275,7 +275,6 @@ export default function App() {
                 </div>
                 <span style={{ fontSize: 11, color: C.mute, whiteSpace: "nowrap" }}>{c.area}</span>
               </div>
-              <div style={{ fontSize: 12, color: C.mute, marginTop: 3 }}>{c.members} 位社員</div>
             </div>
           ))}
         </>)}
@@ -342,8 +341,7 @@ export default function App() {
       {modal?.type === "club" && (
         <Modal title={modal.data.name} onClose={() => setModal(null)}>
           <div style={{ fontSize: 13, color: C.pink, marginBottom: 8 }}>{modal.data.area}</div>
-          <p style={{ fontSize: 14, lineHeight: 1.8 }}>{modal.data.intro}</p>
-          <div style={{ fontSize: 13, color: C.mute, marginBottom: 16 }}>{modal.data.members} 位社員</div>
+          <p style={{ fontSize: 14, lineHeight: 1.8, marginBottom: 16 }}>{modal.data.intro}</p>
           <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 6, padding: "12px 14px", marginBottom: 14 }}><ContactLine contact={modal.data.contact} /></div>
           {isMine(modal.data) && <Btn tone="ghost" style={{ width: "100%" }} onClick={() => setModal({ type: "editClub", data: modal.data })}>✎ 編輯社團資料</Btn>}
         </Modal>
@@ -351,11 +349,11 @@ export default function App() {
 
       {modal?.type === "newClub" && (
         <ClubFormModal onClose={() => setModal(null)}
-          onSubmit={f => create("clubs", { ...f, members: Number(f.members) || 0 }, "社團已登錄名錄")} />
+          onSubmit={f => create("clubs", f, "社團已登錄名錄")} />
       )}
       {modal?.type === "editClub" && (
         <ClubFormModal initial={modal.data} onClose={() => setModal(null)}
-          onSubmit={f => update("clubs", modal.data.id, { ...f, members: Number(f.members) || 0 }, "社團資料已更新")}
+          onSubmit={f => update("clubs", modal.data.id, f, "社團資料已更新")}
           onDelete={() => remove("clubs", modal.data.id, "社團已從名錄移除")} />
       )}
 
@@ -427,14 +425,13 @@ const DeleteRow = ({ onDelete, label }) => (
 function ClubFormModal({ initial, onClose, onSubmit, onDelete }) {
   const editing = Boolean(initial);
   const [f, setF] = useState(initial
-    ? { name: initial.name, area: initial.area, members: String(initial.members ?? ""), intro: initial.intro || "", contact: initial.contact }
-    : { name: "", area: "", members: "", intro: "", contact: "" });
+    ? { name: initial.name, area: initial.area, intro: initial.intro || "", contact: initial.contact }
+    : { name: "", area: "", intro: "", contact: "" });
   const ok = f.name && f.area && f.contact;
   return (
     <Modal title={editing ? "編輯社團資料" : "登錄社團"} onClose={onClose}>
       <Field label="社團名稱 *" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="例:○○高中 熱音社" />
       <Field label="地區 *" value={f.area} onChange={e => setF({ ...f, area: e.target.value })} placeholder="例:新北市.板橋" />
-      <Field label="社員數" type="number" value={f.members} onChange={e => setF({ ...f, members: e.target.value })} />
       <Field label="社團介紹" rows={3} value={f.intro} onChange={e => setF({ ...f, intro: e.target.value })} />
       <Field label="聯絡方式 *" value={f.contact} onChange={e => setF({ ...f, contact: e.target.value })} placeholder="IG / Email(填 @帳號 會變成可點的連結)" />
       <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit(f)}>{editing ? "儲存變更" : "登錄"}</Btn>
