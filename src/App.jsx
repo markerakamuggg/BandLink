@@ -153,10 +153,12 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [clubs, setClubs] = useState([]);
   const [venues, setVenues] = useState([]);
+  const [photography, setPhotography] = useState([]);
   const [events, setEvents] = useState([]);
   const [subs, setSubs] = useState([]);
   const [subFilter, setSubFilter] = useState("全部");
   const [myApps, setMyApps] = useState([]);
+  const [myPhotoApps, setMyPhotoApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
@@ -186,17 +188,23 @@ export default function App() {
     if (!configured) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [c, e, v, s] = await Promise.all([
+      const [c, e, v, s, p] = await Promise.all([
         supabase.from("clubs").select("*").order("created_at"),
         supabase.from("events").select("*").order("date"),
         supabase.from("venues").select("*").order("created_at"),
         supabase.from("subs").select("*").order("created_at", { ascending: false }),
+        supabase.from("photography").select("*").order("created_at"),
       ]);
-      setClubs(c.data || []); setEvents(e.data || []); setVenues(v.data || []); setSubs(s.data || []);
+      setClubs(c.data || []); setEvents(e.data || []); setVenues(v.data || []); setSubs(s.data || []); setPhotography(p.data || []);
       const ids = JSON.parse(localStorage.getItem("my-app-ids") || "[]");
       if (ids.length) {
         const { data } = await supabase.from("venue_apps").select("*").in("id", ids).order("created_at", { ascending: false });
         setMyApps(data || []);
+      }
+      const photoIds = JSON.parse(localStorage.getItem("my-photo-app-ids") || "[]");
+      if (photoIds.length) {
+        const { data } = await supabase.from("photography_apps").select("*").in("id", photoIds).order("created_at", { ascending: false });
+        setMyPhotoApps(data || []);
       }
     } catch (err) { console.error(err); ping("讀取資料失敗,請稍後再試"); }
     setLoading(false);
@@ -245,6 +253,16 @@ export default function App() {
       const ids = JSON.parse(localStorage.getItem("my-app-ids") || "[]");
       localStorage.setItem("my-app-ids", JSON.stringify([data.id, ...ids]));
       setModal(null); ping("場地申請已送出"); reload();
+    } catch (err) { console.error(err); ping("送出失敗,請檢查網路後再試"); }
+  };
+
+  const insertPhotoApp = async row => {
+    try {
+      const { data, error } = await supabase.from("photography_apps").insert(row).select().single();
+      if (error) throw error;
+      const ids = JSON.parse(localStorage.getItem("my-photo-app-ids") || "[]");
+      localStorage.setItem("my-photo-app-ids", JSON.stringify([data.id, ...ids]));
+      setModal(null); ping("攝影申請已送出"); reload();
     } catch (err) { console.error(err); ping("送出失敗,請檢查網路後再試"); }
   };
 
@@ -370,6 +388,37 @@ export default function App() {
           </>)}
         </>)}
 
+        {!loading && tab === "photography" && (<>
+          <SectionTitle zh="攝影申請" en="PHOTOGRAPHY" />
+          {photography.length === 0 && <Empty text="尚未有攝影資料——管理者可至 Supabase 的 photography 表新增" />}
+          {photography.map(p => (
+            <div key={p.id} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, padding: "14px 15px", marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontWeight: 900, fontSize: 16 }}>{p.name}</div>
+                <span style={{ fontSize: 11, color: C.mute }}>{p.area}</span>
+              </div>
+              <div style={{ display: "flex", gap: 6, margin: "7px 0", flexWrap: "wrap" }}>{(p.tags || "").split(",").filter(Boolean).map(t => <Tag key={t}>{t.trim()}</Tag>)}</div>
+              <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}>{p.note}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+                <span style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>{p.price}</span>
+                <Btn onClick={() => setModal({ type: "applyPhoto", data: p })}>申請</Btn>
+              </div>
+            </div>
+          ))}
+          {myPhotoApps.length > 0 && (<>
+            <SectionTitle zh="我的申請" en="MY APPLICATIONS" />
+            {myPhotoApps.map(a => (
+              <div key={a.id} style={{ background: C.card2, border: `1px dashed ${C.line}`, borderRadius: 6, padding: "12px 15px", marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontWeight: 700 }}>{a.photographer}</span>
+                  <Tag tone="pink">{a.state}</Tag>
+                </div>
+                <div style={{ fontSize: 12, color: C.mute, marginTop: 4 }}>{a.club}・活動日期 {fmtDate(a.event_date)}</div>
+              </div>
+            ))}
+          </>)}
+        </>)}
+
         {!loading && tab === "host" && (<>
           <SectionTitle zh="辦一場演出" en="HOST A SHOW" />
           <p style={{ fontSize: 13, color: C.mute, lineHeight: 1.8, marginTop: 0 }}>建立活動需登入,活動會顯示在首頁與跑馬燈,綁定你的帳號、任何裝置都能編輯。建議流程:確認合辦社團 → 申請場地 → 在媒合板徵團 → 公告活動。</p>
@@ -380,7 +429,7 @@ export default function App() {
       </main>
 
       <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40, background: "#120C10", borderTop: `1px solid ${C.line}`, display: "flex", justifyContent: "space-around", padding: "8px 4px calc(8px + env(safe-area-inset-bottom))" }}>
-        {[["home", "首頁", "⌂"], ["clubs", "社團", "♫"], ["subs", "代打", "⇄"], ["host", "辦演出", "★"], ["venues", "場地", "▣"]].map(([k, label, icon]) => (
+        {[["home", "首頁", "⌂"], ["clubs", "社團", "♫"], ["subs", "代打", "⇄"], ["host", "辦演出", "★"], ["venues", "場地", "▣"], ["photography", "攝影", "◉"]].map(([k, label, icon]) => (
           <button key={k} onClick={() => setTab(k)} style={{ background: "none", border: "none", cursor: "pointer", color: tab === k ? C.amber : C.mute, fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, fontSize: 11, letterSpacing: 1 }}>
             <span style={{ fontSize: 17 }}>{icon}</span>{label}
           </button>
@@ -435,6 +484,7 @@ export default function App() {
       )}
 
       {modal?.type === "apply" && <ApplyModal venue={modal.data} onClose={() => setModal(null)} onSubmit={insertApp} />}
+      {modal?.type === "applyPhoto" && <PhotoApplyModal item={modal.data} onClose={() => setModal(null)} onSubmit={insertPhotoApp} />}
 
       {codeError && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(10,6,8,.72)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -575,6 +625,21 @@ function ApplyModal({ venue, onClose, onSubmit }) {
       <Field label="聯絡方式 *" value={f.contact} onChange={e => setF({ ...f, contact: e.target.value })} />
       <Field label="備註" rows={3} value={f.note} onChange={e => setF({ ...f, note: e.target.value })} />
       <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit({ ...f, venue: venue.name })}>送出申請</Btn>
+    </Modal>
+  );
+}
+
+function PhotoApplyModal({ item, onClose, onSubmit }) {
+  const [f, setF] = useState({ club: "", event_date: "", contact: "", note: "" });
+  const ok = f.club && f.event_date && f.contact;
+  return (
+    <Modal title={`申請攝影:${item.name}`} onClose={onClose}>
+      <p style={{ fontSize: 12, color: C.mute, marginTop: 0 }}>{item.note}</p>
+      <Field label="申請社團 *" value={f.club} onChange={e => setF({ ...f, club: e.target.value })} />
+      <Field label="活動日期 *" type="date" value={f.event_date} onChange={e => setF({ ...f, event_date: e.target.value })} />
+      <Field label="聯絡方式 *" value={f.contact} onChange={e => setF({ ...f, contact: e.target.value })} />
+      <Field label="備註" rows={3} value={f.note} onChange={e => setF({ ...f, note: e.target.value })} />
+      <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit({ ...f, photographer: item.name })}>送出申請</Btn>
     </Modal>
   );
 }
