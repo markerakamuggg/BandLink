@@ -285,6 +285,11 @@ export default function App() {
         {loading && <div style={{ padding: 40, textAlign: "center", color: C.mute }}>載入中…</div>}
 
         {!loading && tab === "home" && (<>
+          {clubs.length > 0 && (
+            <div style={{ textAlign: "center", fontSize: 12, color: C.mute, margin: "4px 0 18px", letterSpacing: 1 }}>
+              已有 <span style={{ color: C.amber, fontWeight: 800 }}>{clubs.length}</span> 個社團加入團聚
+            </div>
+          )}
           <SectionTitle zh="近期演出" en="UPCOMING SHOWS" />
           {events.length === 0 && <Empty text="還沒有活動——到「辦演出」建立第一場吧" />}
           {events.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
