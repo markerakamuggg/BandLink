@@ -19,10 +19,15 @@ const Tag = ({ children, tone = "amber" }) => (
   <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: tone === "amber" ? C.amber : C.pink, border: `1px solid ${tone === "amber" ? C.amber : C.pink}`, padding: "2px 8px", borderRadius: 2, whiteSpace: "nowrap" }}>{children}</span>
 );
 
-const SectionTitle = ({ zh, en }) => (
+const SectionTitle = ({ zh, en, collapsible, open, onToggle }) => (
   <div style={{ margin: "22px 0 12px", display: "flex", alignItems: "baseline", gap: 10 }}>
     <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: 2, color: C.paper }}>{zh}</h2>
     <span style={{ fontFamily: "monospace", fontSize: 11, letterSpacing: 2, color: C.mute }}>{en}</span>
+    {collapsible && (
+      <button onClick={onToggle} aria-label={open ? "收起" : "展開"} style={{ marginLeft: "auto", background: "none", border: "none", color: C.mute, fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 4 }}>
+        {open ? "▼" : "▲"}
+      </button>
+    )}
   </div>
 );
 
@@ -159,6 +164,8 @@ export default function App() {
   const [subFilter, setSubFilter] = useState("全部");
   const [myApps, setMyApps] = useState([]);
   const [myPhotoApps, setMyPhotoApps] = useState([]);
+  const [eventsOpen, setEventsOpen] = useState(true);
+  const [subsOpen, setSubsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
@@ -308,12 +315,16 @@ export default function App() {
               已有 <span style={{ color: C.amber, fontWeight: 800 }}>{clubs.length}</span> 個社團加入團聚
             </div>
           )}
-          <SectionTitle zh="近期演出" en="UPCOMING SHOWS" />
-          {events.length === 0 && <Empty text="還沒有活動——到「辦演出」建立第一場吧" />}
-          {events.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
-          <SectionTitle zh="最新徵代打" en="LATEST SUBS" />
-          {subs.length === 0 && <Empty text="還沒有徵代打貼文" />}
-          {subs.slice(0, 3).map(s => <SubCard key={s.id} s={s} onEdit={isMine(s) ? () => setModal({ type: "editSub", data: s }) : undefined} />)}
+          <SectionTitle zh="近期演出" en="UPCOMING SHOWS" collapsible open={eventsOpen} onToggle={() => setEventsOpen(o => !o)} />
+          {eventsOpen && (<>
+            {events.length === 0 && <Empty text="還沒有活動——到「辦演出」建立第一場吧" />}
+            {events.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
+          </>)}
+          <SectionTitle zh="最新徵代打" en="LATEST SUBS" collapsible open={subsOpen} onToggle={() => setSubsOpen(o => !o)} />
+          {subsOpen && (<>
+            {subs.length === 0 && <Empty text="還沒有徵代打貼文" />}
+            {subs.slice(0, 3).map(s => <SubCard key={s.id} s={s} onEdit={isMine(s) ? () => setModal({ type: "editSub", data: s }) : undefined} />)}
+          </>)}
           <div style={{ textAlign: "center", margin: "6px 0 20px" }}>
             <Btn tone="ghost" onClick={() => setTab("subs")}>查看全部徵代打貼文 →</Btn>
           </div>
