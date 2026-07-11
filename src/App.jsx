@@ -310,9 +310,9 @@ export default function App() {
         {loading && <div style={{ padding: 40, textAlign: "center", color: C.mute }}>載入中…</div>}
 
         {!loading && tab === "home" && (<>
-          {clubs.length > 0 && (
+          {(clubs.length > 0 || events.length > 0) && (
             <div style={{ textAlign: "center", fontSize: 12, color: C.mute, margin: "4px 0 18px", letterSpacing: 1 }}>
-              已有 <span style={{ color: C.amber, fontWeight: 800 }}>{clubs.length}</span> 個社團加入團聚
+              已有 <span style={{ color: C.amber, fontWeight: 800 }}>{clubs.length}</span> 個社團加入團聚・目前 <span style={{ color: C.amber, fontWeight: 800 }}>{events.length}</span> 場表演登錄
             </div>
           )}
           <SectionTitle zh="近期演出" en="UPCOMING SHOWS" collapsible open={eventsOpen} onToggle={() => setEventsOpen(o => !o)} />
