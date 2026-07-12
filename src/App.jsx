@@ -82,6 +82,16 @@ const fmtDateTime = d => {
 };
 
 const igHandle = t => { const m = String(t || "").match(/@([A-Za-z0-9._]{2,30})/); return m ? m[1] : null; };
+const emailAddr = t => { const m = String(t || "").match(/[^\s@]+@[^\s@]+\.[^\s@]+/); return m ? m[0] : null; };
+const contactHref = t => {
+  // check email first: an email's domain (e.g. "@example.com") would otherwise
+  // false-match the IG handle pattern, since "." is a valid handle character
+  const e = emailAddr(t);
+  if (e) return `mailto:${e}`;
+  const h = igHandle(t);
+  if (h) return `https://www.instagram.com/${h}/`;
+  return null;
+};
 
 const IgChip = ({ from }) => {
   const h = igHandle(from);
@@ -95,11 +105,11 @@ const IgChip = ({ from }) => {
 };
 
 const ContactLine = ({ contact }) => {
-  const h = igHandle(contact);
+  const href = contactHref(contact);
   return (
     <div style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>
-      聯絡:{h
-        ? <a href={`https://www.instagram.com/${h}/`} target="_blank" rel="noreferrer" style={{ color: C.amber, textDecoration: "underline" }}>{contact}</a>
+      聯絡:{href
+        ? <a href={href} target="_blank" rel="noreferrer" style={{ color: C.amber, textDecoration: "underline" }}>{contact}</a>
         : contact}
     </div>
   );
@@ -392,7 +402,7 @@ export default function App() {
                 <div style={{ fontWeight: 900, fontSize: 16 }}>{v.name}</div>
                 <span style={{ fontSize: 11, color: C.mute }}>{v.area}</span>
               </div>
-              <div style={{ display: "flex", gap: 6, margin: "7px 0", flexWrap: "wrap" }}>{(v.tags || "").split(",").filter(Boolean).map(t => <Tag key={t}>{t.trim()}</Tag>)}</div>
+              <ContactLine contact={v.contact} />
               <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}><LinkifyNote text={v.note} /></div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
                 <span style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>容納 {v.cap} 人・{v.price}</span>
@@ -423,7 +433,7 @@ export default function App() {
                 <div style={{ fontWeight: 900, fontSize: 16 }}>{p.name}</div>
                 <span style={{ fontSize: 11, color: C.mute }}>{p.area}</span>
               </div>
-              <div style={{ display: "flex", gap: 6, margin: "7px 0", flexWrap: "wrap" }}>{(p.tags || "").split(",").filter(Boolean).map(t => <Tag key={t}>{t.trim()}</Tag>)}</div>
+              <ContactLine contact={p.contact} />
               <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}><LinkifyNote text={p.note} /></div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
                 <span style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>{p.price}</span>
