@@ -105,6 +105,21 @@ const ContactLine = ({ contact }) => {
   );
 };
 
+const LinkifyNote = ({ text }) => {
+  const raw = String(text || "");
+  const m = raw.match(/@([A-Za-z0-9._]{2,30})/);
+  if (!m) return <>{raw}</>;
+  const before = raw.slice(0, m.index);
+  const after = raw.slice(m.index + m[0].length);
+  return (
+    <>
+      {before}
+      <a href={`https://www.instagram.com/${m[1]}/`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ color: C.amber, textDecoration: "underline" }}>{m[0]}</a>
+      {after}
+    </>
+  );
+};
+
 const TicketCard = ({ ev, onEdit }) => (
   <div style={{ display: "flex", background: C.card2, borderRadius: 6, overflow: "hidden", marginBottom: 14, border: `1px solid ${C.line}` }}>
     <div style={{ flex: 1, padding: "14px 16px" }}>
@@ -378,7 +393,7 @@ export default function App() {
                 <span style={{ fontSize: 11, color: C.mute }}>{v.area}</span>
               </div>
               <div style={{ display: "flex", gap: 6, margin: "7px 0", flexWrap: "wrap" }}>{(v.tags || "").split(",").filter(Boolean).map(t => <Tag key={t}>{t.trim()}</Tag>)}</div>
-              <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}>{v.note}</div>
+              <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}><LinkifyNote text={v.note} /></div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
                 <span style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>容納 {v.cap} 人・{v.price}</span>
                 <Btn onClick={() => setModal({ type: "apply", data: v })}>申請</Btn>
@@ -409,7 +424,7 @@ export default function App() {
                 <span style={{ fontSize: 11, color: C.mute }}>{p.area}</span>
               </div>
               <div style={{ display: "flex", gap: 6, margin: "7px 0", flexWrap: "wrap" }}>{(p.tags || "").split(",").filter(Boolean).map(t => <Tag key={t}>{t.trim()}</Tag>)}</div>
-              <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}>{p.note}</div>
+              <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}><LinkifyNote text={p.note} /></div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
                 <span style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>{p.price}</span>
                 <Btn onClick={() => setModal({ type: "applyPhoto", data: p })}>申請</Btn>
@@ -629,7 +644,7 @@ function ApplyModal({ venue, onClose, onSubmit }) {
   const ok = f.club && f.event_date && f.contact;
   return (
     <Modal title={`申請場地:${venue.name}`} onClose={onClose}>
-      <p style={{ fontSize: 12, color: C.mute, marginTop: 0 }}>{venue.note}</p>
+      <p style={{ fontSize: 12, color: C.mute, marginTop: 0 }}><LinkifyNote text={venue.note} /></p>
       <Field label="申請社團 *" value={f.club} onChange={e => setF({ ...f, club: e.target.value })} />
       <Field label="活動日期 *" type="date" value={f.event_date} onChange={e => setF({ ...f, event_date: e.target.value })} />
       <Field label="預估人數" value={f.size} onChange={e => setF({ ...f, size: e.target.value })} />
@@ -645,7 +660,7 @@ function PhotoApplyModal({ item, onClose, onSubmit }) {
   const ok = f.club && f.event_date && f.contact;
   return (
     <Modal title={`申請攝影:${item.name}`} onClose={onClose}>
-      <p style={{ fontSize: 12, color: C.mute, marginTop: 0 }}>{item.note}</p>
+      <p style={{ fontSize: 12, color: C.mute, marginTop: 0 }}><LinkifyNote text={item.note} /></p>
       <Field label="申請社團 *" value={f.club} onChange={e => setF({ ...f, club: e.target.value })} />
       <Field label="活動日期 *" type="date" value={f.event_date} onChange={e => setF({ ...f, event_date: e.target.value })} />
       <Field label="聯絡方式 *" value={f.contact} onChange={e => setF({ ...f, contact: e.target.value })} />
