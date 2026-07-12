@@ -115,6 +115,17 @@ const ContactLine = ({ contact }) => {
   );
 };
 
+const ContactBtn = ({ contact }) => {
+  const href = contactHref(contact);
+  if (!href) return <span style={{ fontSize: 12, color: C.mute }}>尚未提供聯絡方式</span>;
+  return (
+    <a href={href} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+      style={{ display: "inline-block", background: C.amber, color: "#1A1115", fontWeight: 800, fontSize: 14, letterSpacing: 1, padding: "10px 18px", borderRadius: 4, textDecoration: "none", fontFamily: "inherit" }}>
+      聯絡 {contact}
+    </a>
+  );
+};
+
 const LinkifyNote = ({ text }) => {
   const raw = String(text || "");
   const m = raw.match(/@([A-Za-z0-9._]{2,30})/);
@@ -187,8 +198,6 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [subs, setSubs] = useState([]);
   const [subFilter, setSubFilter] = useState("全部");
-  const [myApps, setMyApps] = useState([]);
-  const [myPhotoApps, setMyPhotoApps] = useState([]);
   const [eventsOpen, setEventsOpen] = useState(true);
   const [subsOpen, setSubsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -228,16 +237,6 @@ export default function App() {
         supabase.from("photography").select("*").order("created_at"),
       ]);
       setClubs(c.data || []); setEvents(e.data || []); setVenues(v.data || []); setSubs(s.data || []); setPhotography(p.data || []);
-      const ids = JSON.parse(localStorage.getItem("my-app-ids") || "[]");
-      if (ids.length) {
-        const { data } = await supabase.from("venue_apps").select("*").in("id", ids).order("created_at", { ascending: false });
-        setMyApps(data || []);
-      }
-      const photoIds = JSON.parse(localStorage.getItem("my-photo-app-ids") || "[]");
-      if (photoIds.length) {
-        const { data } = await supabase.from("photography_apps").select("*").in("id", photoIds).order("created_at", { ascending: false });
-        setMyPhotoApps(data || []);
-      }
     } catch (err) { console.error(err); ping("讀取資料失敗,請稍後再試"); }
     setLoading(false);
   };
@@ -276,26 +275,6 @@ export default function App() {
       if (!data) { setCodeError(true); return; }
       setModal(null); ping("認領成功,這筆內容已綁定你的帳號"); reload();
     } catch (err) { console.error(err); ping("操作失敗,請檢查網路後再試"); }
-  };
-
-  const insertApp = async row => {
-    try {
-      const { data, error } = await supabase.from("venue_apps").insert(row).select().single();
-      if (error) throw error;
-      const ids = JSON.parse(localStorage.getItem("my-app-ids") || "[]");
-      localStorage.setItem("my-app-ids", JSON.stringify([data.id, ...ids]));
-      setModal(null); ping("場地申請已送出"); reload();
-    } catch (err) { console.error(err); ping("送出失敗,請檢查網路後再試"); }
-  };
-
-  const insertPhotoApp = async row => {
-    try {
-      const { data, error } = await supabase.from("photography_apps").insert(row).select().single();
-      if (error) throw error;
-      const ids = JSON.parse(localStorage.getItem("my-photo-app-ids") || "[]");
-      localStorage.setItem("my-photo-app-ids", JSON.stringify([data.id, ...ids]));
-      setModal(null); ping("攝影申請已送出"); reload();
-    } catch (err) { console.error(err); ping("送出失敗,請檢查網路後再試"); }
   };
 
   if (!configured) return (
@@ -402,26 +381,13 @@ export default function App() {
                 <div style={{ fontWeight: 900, fontSize: 16 }}>{v.name}</div>
                 <span style={{ fontSize: 11, color: C.mute }}>{v.area}</span>
               </div>
-              <ContactLine contact={v.contact} />
-              <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}><LinkifyNote text={v.note} /></div>
+              <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6, margin: "6px 0" }}><LinkifyNote text={v.note} /></div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
                 <span style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>容納 {v.cap} 人・{v.price}</span>
-                <Btn onClick={() => setModal({ type: "apply", data: v })}>申請</Btn>
+                <ContactBtn contact={v.contact} />
               </div>
             </div>
           ))}
-          {myApps.length > 0 && (<>
-            <SectionTitle zh="我的申請" en="MY APPLICATIONS" />
-            {myApps.map(a => (
-              <div key={a.id} style={{ background: C.card2, border: `1px dashed ${C.line}`, borderRadius: 6, padding: "12px 15px", marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontWeight: 700 }}>{a.venue}</span>
-                  <Tag tone="pink">{a.state}</Tag>
-                </div>
-                <div style={{ fontSize: 12, color: C.mute, marginTop: 4 }}>{a.club}・活動日期 {fmtDate(a.event_date)}</div>
-              </div>
-            ))}
-          </>)}
         </>)}
 
         {!loading && tab === "photography" && (<>
@@ -433,26 +399,13 @@ export default function App() {
                 <div style={{ fontWeight: 900, fontSize: 16 }}>{p.name}</div>
                 <span style={{ fontSize: 11, color: C.mute }}>{p.area}</span>
               </div>
-              <ContactLine contact={p.contact} />
-              <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6 }}><LinkifyNote text={p.note} /></div>
+              <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6, margin: "6px 0" }}><LinkifyNote text={p.note} /></div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
                 <span style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>{p.price}</span>
-                <Btn onClick={() => setModal({ type: "applyPhoto", data: p })}>申請</Btn>
+                <ContactBtn contact={p.contact} />
               </div>
             </div>
           ))}
-          {myPhotoApps.length > 0 && (<>
-            <SectionTitle zh="我的申請" en="MY APPLICATIONS" />
-            {myPhotoApps.map(a => (
-              <div key={a.id} style={{ background: C.card2, border: `1px dashed ${C.line}`, borderRadius: 6, padding: "12px 15px", marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontWeight: 700 }}>{a.photographer}</span>
-                  <Tag tone="pink">{a.state}</Tag>
-                </div>
-                <div style={{ fontSize: 12, color: C.mute, marginTop: 4 }}>{a.club}・活動日期 {fmtDate(a.event_date)}</div>
-              </div>
-            ))}
-          </>)}
         </>)}
 
         {!loading && tab === "host" && (<>
@@ -518,9 +471,6 @@ export default function App() {
           <Btn style={{ width: "100%" }} onClick={login}>使用 Google 登入</Btn>
         </Modal>
       )}
-
-      {modal?.type === "apply" && <ApplyModal venue={modal.data} onClose={() => setModal(null)} onSubmit={insertApp} />}
-      {modal?.type === "applyPhoto" && <PhotoApplyModal item={modal.data} onClose={() => setModal(null)} onSubmit={insertPhotoApp} />}
 
       {codeError && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(10,6,8,.72)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -649,33 +599,3 @@ function ClaimModal({ onClose, onSubmit }) {
   );
 }
 
-function ApplyModal({ venue, onClose, onSubmit }) {
-  const [f, setF] = useState({ club: "", event_date: "", size: "", contact: "", note: "" });
-  const ok = f.club && f.event_date && f.contact;
-  return (
-    <Modal title={`申請場地:${venue.name}`} onClose={onClose}>
-      <p style={{ fontSize: 12, color: C.mute, marginTop: 0 }}><LinkifyNote text={venue.note} /></p>
-      <Field label="申請社團 *" value={f.club} onChange={e => setF({ ...f, club: e.target.value })} />
-      <Field label="活動日期 *" type="date" value={f.event_date} onChange={e => setF({ ...f, event_date: e.target.value })} />
-      <Field label="預估人數" value={f.size} onChange={e => setF({ ...f, size: e.target.value })} />
-      <Field label="聯絡方式 *" value={f.contact} onChange={e => setF({ ...f, contact: e.target.value })} />
-      <Field label="備註" rows={3} value={f.note} onChange={e => setF({ ...f, note: e.target.value })} />
-      <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit({ ...f, venue: venue.name })}>送出申請</Btn>
-    </Modal>
-  );
-}
-
-function PhotoApplyModal({ item, onClose, onSubmit }) {
-  const [f, setF] = useState({ club: "", event_date: "", contact: "", note: "" });
-  const ok = f.club && f.event_date && f.contact;
-  return (
-    <Modal title={`申請攝影:${item.name}`} onClose={onClose}>
-      <p style={{ fontSize: 12, color: C.mute, marginTop: 0 }}><LinkifyNote text={item.note} /></p>
-      <Field label="申請社團 *" value={f.club} onChange={e => setF({ ...f, club: e.target.value })} />
-      <Field label="活動日期 *" type="date" value={f.event_date} onChange={e => setF({ ...f, event_date: e.target.value })} />
-      <Field label="聯絡方式 *" value={f.contact} onChange={e => setF({ ...f, contact: e.target.value })} />
-      <Field label="備註" rows={3} value={f.note} onChange={e => setF({ ...f, note: e.target.value })} />
-      <Btn disabled={!ok} style={{ width: "100%", opacity: ok ? 1 : .4 }} onClick={() => ok && onSubmit({ ...f, photographer: item.name })}>送出申請</Btn>
-    </Modal>
-  );
-}
