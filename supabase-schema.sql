@@ -3,6 +3,11 @@
 --    不是要拿去重新執行的建置腳本。這個專案已經上線、已有真實社團/活動資料,
 --    整段重跑會建表失敗(表已存在)或砍掉正式資料——不要這樣做。
 --    用途:留底現況,以及之後要建全新環境(例如測試專案)時參考。
+--
+-- ⚠️ 這份留底檔曾經落後正式環境:App 實際在讀的 subs / photography 兩張表原本完全沒收錄,
+--    而 posts / venue_apps 早已從 App 移除卻還留著。已於下方補齊並標註。
+--    subs / photography 的欄位定義是「從 src/App.jsx 與 api/remind-subs.js 的用法反推」,
+--    尚未與正式環境核對過——請執行 db/introspect.sql 取得真實欄位後再修正這兩段。
 
 create table clubs (
   id uuid primary key default gen_random_uuid(),
@@ -17,6 +22,8 @@ create table clubs (
   user_id uuid default auth.uid()
 );
 
+-- ⚠️ 已停用:App 已無任何程式碼讀寫 posts,功能由 subs(徵代打)取代。
+--    表仍存在於正式環境,保留以免動到既有資料。
 create table posts (
   id uuid primary key default gen_random_uuid(),
   kind text not null check (kind in ('徵團','自薦')),
@@ -50,10 +57,12 @@ create table venues (
   cap int default 0,
   price text default '',
   note text default '',
-  tags text default '',
+  tags text default '',   -- ⚠️ 語意已於 d0ed916 改為「聯絡方式」(IG @帳號 / email 會自動轉超連結),欄位名未改
   created_at timestamptz default now()
 );
 
+-- ⚠️ 已停用:場地/攝影已於 631300c 改為直接聯絡,申請流程與相關程式碼皆已移除。
+--    表仍存在於正式環境,裡面的資料是舊制殘留,不會再有新增。
 create table venue_apps (
   id uuid primary key default gen_random_uuid(),
   venue text not null,
@@ -63,6 +72,35 @@ create table venue_apps (
   contact text not null,
   note text default '',
   state text default '審核中',
+  created_at timestamptz default now()
+);
+
+-- 徵代打貼文。⚠️ 以下欄位由 src/App.jsx(SubCard / SubFormModal)與 api/remind-subs.js 反推,未經正式環境核對
+create table subs (
+  id uuid primary key default gen_random_uuid(),
+  song text not null,
+  tags text[] default '{}',            -- 複選標籤,App 端以陣列操作
+  event_name text not null,            -- 成發名稱
+  event_time_place text not null,      -- 時間地點(自由文字,例「8/23 12:30 西門河岸留言」)
+  event_clubs text default '',         -- 參加的社團(自由文字)
+  note text default '',
+  contact text not null,
+  filled boolean default false,        -- 已徵到人
+  expires_at timestamptz,              -- 報名截止(選填)
+  reminder_sent_at timestamptz,        -- 提醒信寄出時間,由 api/remind-subs.js 寫入
+  created_at timestamptz default now(),
+  user_id uuid default auth.uid()
+);
+
+-- 攝影:與 venues 同樣只能由管理者用 Supabase Table Editor 維護,App 內沒有新增/編輯介面
+-- ⚠️ 以下欄位由 src/App.jsx 的攝影分頁反推,未經正式環境核對
+create table photography (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  area text default '',
+  price text default '',
+  note text default '',                -- 內含 IG @帳號 / email 會被 App 自動轉為超連結
+  contact text default '',
   created_at timestamptz default now()
 );
 
@@ -81,6 +119,8 @@ alter table events enable row level security;
 alter table venues enable row level security;
 alter table venue_apps enable row level security;
 alter table edit_keys enable row level security;
+alter table subs enable row level security;
+alter table photography enable row level security;
 
 create policy "clubs 公開讀取" on clubs for select using (true);
 create policy "clubs 登入新增" on clubs for insert with check (auth.uid() = user_id);
@@ -98,6 +138,13 @@ create policy "events 本人修改" on events for update using (auth.uid() = use
 create policy "events 本人刪除" on events for delete using (auth.uid() = user_id);
 
 create policy "venues 公開讀取" on venues for select using (true);
+
+create policy "photography 公開讀取" on photography for select using (true);
+
+create policy "subs 公開讀取" on subs for select using (true);
+create policy "subs 登入新增" on subs for insert with check (auth.uid() = user_id);
+create policy "subs 本人修改" on subs for update using (auth.uid() = user_id);
+create policy "subs 本人刪除" on subs for delete using (auth.uid() = user_id);
 
 create policy "venue_apps 公開讀取" on venue_apps for select using (true);
 create policy "venue_apps 公開新增" on venue_apps for insert with check (true);
