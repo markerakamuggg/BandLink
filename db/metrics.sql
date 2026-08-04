@@ -13,7 +13,7 @@
 --    同一台裝置回訪時 token 是自動續期,不會產生新的登入事件。也就是說第 2、3 段的
 --    「回訪」與「活躍」是**低估值**——天天在用但沒登出過的人,看起來會像很久沒出現。
 --
--- 3. 標著【需要 001 migration】的段落要先跑 migrations/001_add_updated_at.sql。
+-- 3. 標著【需要 migration】的段落要先跑 migrations/20260804_add_updated_at.sql。
 --    它問的是「有沒有回來『編輯內容』」,跟第 2 段的「有沒有回來『登入』」是兩件事。
 
 -- ── 1. 基本量體 ──────────────────────────────────────────
@@ -137,11 +137,35 @@ select
         / nullif(count(*), 0), 1)              as pct_filled
 from subs;
 
--- ── 13. 建檔後有沒有回來編輯過 【需要 001 migration】────────
--- 跟第 2 段互補:那邊問「有沒有回來登入」,這邊問「有沒有回來維護內容」
+-- ── 13. 建檔後有沒有回來編輯過 【需要 migration】──────────
+-- 跟第 2 段互補:那邊問「有沒有回來登入」,這邊問「有沒有回來維護內容」。
+-- ⚠️ 已實測確認 claim_item() 認領舊資料時的 update 也會觸發 trigger,
+--    被記成一次編輯。認領是一次性綁定不是內容維護,會讓這裡的比例偏高。
+--    搭配第 14 段看還有多少舊資料未認領,判斷灌水程度。
 select
   count(*)                                                               as clubs_total,
   count(*) filter (where updated_at > created_at + interval '10 minutes') as edited_later,
   round(100.0 * count(*) filter (where updated_at > created_at + interval '10 minutes')
         / nullif(count(*), 0), 1)                                        as pct_edited
 from clubs;
+
+-- ── 14. 還有多少舊資料沒被認領(判讀第 13 段的輔助) ──────────
+-- edit_keys 每被認領一次就刪一列。數字還很大 = 認領還在發生 = 第 13 段會持續被灌水
+select item_table, count(*) as unclaimed
+from edit_keys
+group by item_table
+order by unclaimed desc;
+
+-- ── 15. subs 的編輯要扣掉系統寫入 【需要 migration】──────────
+-- api/remind-subs.js 寄完提醒信會 update subs set reminder_sent_at,那是系統動作。
+-- 扣掉「只被系統碰過」的那些,才是使用者真的回來改過的貼文。
+select
+  count(*)                                                                as subs_total,
+  count(*) filter (where updated_at > created_at + interval '10 minutes') as touched_later,
+  count(*) filter (where updated_at > created_at + interval '10 minutes'
+                     and reminder_sent_at is not null
+                     and updated_at = reminder_sent_at)                   as system_only,
+  count(*) filter (where updated_at > created_at + interval '10 minutes'
+                     and (reminder_sent_at is null
+                          or updated_at <> reminder_sent_at))             as user_edited
+from subs;

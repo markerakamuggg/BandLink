@@ -6,7 +6,7 @@
 |---|---|---|
 | `introspect.sql` | 讀出正式環境現在真正的結構,用來核對 `../supabase-schema.sql` 有沒有過期 | 否,純唯讀 |
 | `metrics.sql` | 使用狀況查詢:多少帳號、留存、多少社團真的在用、代打成效等 | 否,純唯讀 |
-| `migrations/001_add_updated_at.sql` | 加上「最後修改時間」欄位與觸發器 | 會,但只新增欄位,不刪不覆寫 |
+| `migrations/20260804_add_updated_at.sql` | 為 clubs / venues / events / subs 加上「最後修改時間」欄位與觸發器 | 會,但只新增欄位,不刪不覆寫 |
 
 ## 建議順序
 
@@ -14,8 +14,8 @@
    目前該檔案裡 `subs` 與 `photography` 兩張表的欄位是**從程式碼反推的,尚未核對過**,
    對完之後請把差異修正回去。
 2. 跑 `metrics.sql` 看現況。標著【估計】的段落數字不精確,原因見下。
-3. 想要「留存率」這類指標,再跑 `migrations/001_add_updated_at.sql`,
-   之後 `metrics.sql` 的 4b 段就能用。
+3. 想要「有沒有回來維護內容」這類指標,再跑 `migrations/20260804_add_updated_at.sql`,
+   之後 `metrics.sql` 的 13、15 段就能用。
 
 ## 為什麼有些數字只能是估計
 
@@ -49,7 +49,7 @@
 | 想問的事 | 資料來源 | 現在問得出來嗎 |
 |---|---|---|
 | 有沒有再回來**登入** | `auth.users.last_sign_in_at` | ✅ 現成的,`metrics.sql` 第 2 段 |
-| 有沒有再回來**維護內容** | 需要 `updated_at` 欄位 | ⚠️ 要先跑 001 migration |
+| 有沒有再回來**維護內容** | 需要 `updated_at` 欄位 | ⚠️ 要先跑 20260804 migration |
 
 **登入那邊有個重要的低估問題。** App 用的是 supabase-js 預設設定(`src/supabase.js` 沒有傳任何 options,
 所以 `persistSession` 和 `autoRefreshToken` 都是開的)。同一台裝置回訪時,token 是背景自動續期,
@@ -65,5 +65,16 @@
 所有表都只有 `created_at`(建立時間),沒有記錄「後來被改過」。
 所以「登記完就再也沒動」和「持續在維護」的社團,在資料上長得一模一樣。
 
-`migrations/001_add_updated_at.sql` 補上這個欄位,但**只對執行之後的編輯有效** ——
+`migrations/20260804_add_updated_at.sql` 補上這個欄位,但**只對執行之後的編輯有效** ——
 過去誰改過什麼沒有留下痕跡,補不回來。越早跑,累積的資料越多。
+
+跑之前先知道三件事(都已在本地 Postgres 16 用同結構空庫實測確認):
+
+1. **App 的編輯是真正的 UPDATE。** `src/App.jsx:254-260` 走的是
+   `supabase.from(table).update()`,不是刪掉再新增,所以 trigger 會正常觸發。
+2. **`claim_item()` 認領舊資料會被記成一次編輯。** 它內部是
+   `update clubs set user_id = auth.uid()`,同樣觸發 trigger。認領是一次性的
+   帳號綁定,不是內容維護,會讓 `pct_edited` 偏高。用 `metrics.sql` 第 14 段
+   看還有多少舊資料未認領,判斷灌水程度。
+3. **`subs` 有系統寫入。** `api/remind-subs.js` 寄完提醒信會更新
+   `reminder_sent_at`,那不是使用者編輯。`metrics.sql` 第 15 段有扣掉的版本。
