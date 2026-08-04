@@ -2,20 +2,32 @@
 
 資料庫相關的 SQL。全部都是拿去 Supabase 主控台的 **SQL Editor** 貼上執行,不是給程式跑的。
 
-| 檔案 | 用途 | 會不會改到資料 |
-|---|---|---|
-| `introspect.sql` | 讀出正式環境現在真正的結構,用來核對 `../supabase-schema.sql` 有沒有過期 | 否,純唯讀 |
-| `metrics.sql` | 使用狀況查詢:多少帳號、留存、多少社團真的在用、代打成效等 | 否,純唯讀 |
-| `migrations/20260804_add_updated_at.sql` | 為 clubs / venues / events / subs 加上「最後修改時間」欄位與觸發器 | 會,但只新增欄位,不刪不覆寫 |
+| 檔案 | 用途 | 回傳量 | 會不會改到資料 |
+|---|---|---|---|
+| `verify-schema.sql` | 核對 `../supabase-schema.sql` 與正式環境是否一致,**只列出不一致的地方** | 一張小表 | 否,純唯讀 |
+| `snapshot.sql` | 現況快照:帳號、留存、內容量、活動、代打全部濃縮成一張窄表 | 一張窄表 | 否,純唯讀 |
+| `introspect.sql` | 完整結構 dump(欄位、外鍵、RLS)。`verify-schema.sql` 報出問題時才需要 | 四張大表 | 否,純唯讀 |
+| `metrics.sql` | 逐項明細:社團名單、host 長相、每週趨勢、比對診斷 | 十五張表 | 否,純唯讀 |
+| `migrations/20260804_add_updated_at.sql` | 為 clubs / venues / events / subs 加上「最後修改時間」欄位與觸發器 | — | 會,但只新增欄位,不刪不覆寫 |
 
 ## 建議順序
 
-1. 先跑 `introspect.sql`,確認 `../supabase-schema.sql` 的內容跟正式環境一致。
-   目前該檔案裡 `subs` 與 `photography` 兩張表的欄位是**從程式碼反推的,尚未核對過**,
-   對完之後請把差異修正回去。
-2. 跑 `metrics.sql` 看現況。標著【估計】的段落數字不精確,原因見下。
-3. 想要「有沒有回來維護內容」這類指標,再跑 `migrations/20260804_add_updated_at.sql`,
-   之後 `metrics.sql` 的 13、15 段就能用。
+**日常只要跑前兩個就夠了。**
+
+1. **`verify-schema.sql`** — 確認文件跟正式環境還對得上。
+   看到「✅ 完全一致」就過關;有列出東西再去跑 `introspect.sql` 拿完整結構。
+
+   目前 `../supabase-schema.sql` 裡 `subs` 與 `photography` 兩張表的欄位是
+   **從程式碼反推的,從未核對過**,所以第一次跑很可能會報出差異,那是預期內的。
+
+2. **`snapshot.sql`** — 一次拿到所有關鍵數字。不必先跑 migration,
+   跟 `updated_at` 有關的那列會自動顯示「尚未啟用」。
+
+3. 想深入看某一項(哪些社團、host 到底怎麼寫的、每週趨勢)再跑 `metrics.sql`。
+
+4. 想要「有沒有回來維護內容」這個指標,跑 `migrations/20260804_add_updated_at.sql`。
+   跑完之後 `verify-schema.sql` 會多報四列 `updated_at`「實際有,文件沒寫」,
+   那是正常的,不是問題。
 
 ## 為什麼有些數字只能是估計
 
