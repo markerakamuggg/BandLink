@@ -74,6 +74,9 @@ const Modal = ({ title, onClose, children }) => (
 
 const fmtDate = d => (d ? String(d).slice(0, 10).replaceAll("-", "/") : "");
 
+// 活動日期已過即視為結束(當天仍算進行中)。sv 地區格式恰為 YYYY-MM-DD,可直接與 date 欄位字串比較
+const evEnded = ev => String(ev.date || "").slice(0, 10) < new Date().toLocaleDateString("sv");
+
 const fmtDateTime = d => {
   if (!d) return "";
   const dt = new Date(d);
@@ -141,8 +144,10 @@ const LinkifyNote = ({ text }) => {
   );
 };
 
-const TicketCard = ({ ev, onEdit }) => (
-  <div style={{ display: "flex", background: C.card2, borderRadius: 6, overflow: "hidden", marginBottom: 14, border: `1px solid ${C.line}` }}>
+const TicketCard = ({ ev, onEdit }) => {
+  const ended = evEnded(ev);
+  return (
+  <div style={{ display: "flex", background: C.card2, borderRadius: 6, overflow: "hidden", marginBottom: 14, border: `1px solid ${C.line}`, opacity: ended ? .55 : 1 }}>
     <div style={{ flex: 1, padding: "14px 16px" }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
         <span style={{ fontFamily: "monospace", fontSize: 11, color: C.mute }}>{fmtDate(ev.date)}・{ev.time}</span>
@@ -150,6 +155,7 @@ const TicketCard = ({ ev, onEdit }) => (
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <span style={{ fontSize: 17, fontWeight: 900, letterSpacing: 1, color: C.paper, lineHeight: 1.35 }}>{ev.title}</span>
+        {ended && <Tag tone="amber">已結束</Tag>}
         <IgChip from={`${ev.contact || ""} ${ev.host || ""} ${ev.descr || ""}`} />
       </div>
       <div style={{ fontSize: 13, color: C.amber, margin: "4px 0 6px" }}>{ev.host}</div>
@@ -158,10 +164,11 @@ const TicketCard = ({ ev, onEdit }) => (
       {ev.contact && <div style={{ marginTop: 6 }}><ContactLine contact={ev.contact} /></div>}
     </div>
     <div style={{ width: 56, borderLeft: `2px dashed ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", background: C.card }}>
-      <span style={{ writingMode: "vertical-rl", fontFamily: "monospace", fontSize: 11, letterSpacing: 3, color: C.mute }}>ADMIT ONE</span>
+      <span style={{ writingMode: "vertical-rl", fontFamily: "monospace", fontSize: 11, letterSpacing: 3, color: C.mute }}>{ended ? "SHOW ENDED" : "ADMIT ONE"}</span>
     </div>
   </div>
-);
+  );
+};
 
 const SubCard = ({ s, onEdit }) => {
   const expired = s.expires_at && new Date(s.expires_at) < new Date();
@@ -288,6 +295,10 @@ export default function App() {
 
   const userName = session?.user?.user_metadata?.name || session?.user?.email || "";
 
+  // 進行中在前(日期近的先)、已結束墊底(剛結束的先);events 本身已按日期升冪
+  const upcomingEvents = events.filter(e => !evEnded(e));
+  const endedEvents = events.filter(evEnded).reverse();
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.paper, fontFamily: "'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif", paddingBottom: 76 }}>
       <header style={{ padding: "18px 18px 0" }}>
@@ -302,10 +313,10 @@ export default function App() {
         </div>
       </header>
 
-      {events.length > 0 && (
+      {upcomingEvents.length > 0 && (
         <div style={{ overflow: "hidden", borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}`, margin: "12px 0 0", background: "#120C10" }}>
           <div className="marquee" style={{ display: "inline-block", whiteSpace: "nowrap", padding: "6px 0", fontFamily: "monospace", fontSize: 12, letterSpacing: 2, color: C.amber }}>
-            {events.map(e => ` ★ ${fmtDate(e.date)} ${e.title} @${e.venue} `).join("・").repeat(3)}
+            {upcomingEvents.map(e => ` ★ ${fmtDate(e.date)} ${e.title} @${e.venue} `).join("・").repeat(3)}
           </div>
         </div>
       )}
@@ -322,7 +333,9 @@ export default function App() {
           <SectionTitle zh="近期演出" en="UPCOMING SHOWS" collapsible open={eventsOpen} onToggle={() => setEventsOpen(o => !o)} />
           {eventsOpen && (<>
             {events.length === 0 && <Empty text="還沒有活動——到「辦演出」建立第一場吧" />}
-            {events.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
+            {events.length > 0 && upcomingEvents.length === 0 && <Empty text="近期沒有活動——到「辦演出」發布下一場吧" />}
+            {upcomingEvents.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
+            {endedEvents.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
           </>)}
           <SectionTitle zh="最新徵代打" en="LATEST SUBS" collapsible open={subsOpen} onToggle={() => setSubsOpen(o => !o)} />
           {subsOpen && (<>
