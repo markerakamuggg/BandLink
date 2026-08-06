@@ -4,10 +4,9 @@
 --    整段重跑會建表失敗(表已存在)或砍掉正式資料——不要這樣做。
 --    用途:留底現況,以及之後要建全新環境(例如測試專案)時參考。
 --
--- ⚠️ 這份留底檔曾經落後正式環境:App 實際在讀的 subs / photography 兩張表原本完全沒收錄,
---    而 posts / venue_apps 早已從 App 移除卻還留著。已於下方補齊並標註。
---    subs / photography 的欄位定義是「從 src/App.jsx 與 api/remind-subs.js 的用法反推」,
---    尚未與正式環境核對過——請執行 db/introspect.sql 取得真實欄位後再修正這兩段。
+-- ✅ 2026-08-06 已以 db/verify-schema.sql 與正式環境完整核對:所有表、欄位、型別一致。
+--    之後改動資料庫結構時,請同步更新這份檔案與 db/verify-schema.sql 的 documented 清單,
+--    再跑一次 verify-schema.sql 確認。
 
 create table clubs (
   id uuid primary key default gen_random_uuid(),
@@ -57,7 +56,7 @@ create table venues (
   cap int default 0,
   price text default '',
   note text default '',
-  tags text default '',   -- ⚠️ 語意已於 d0ed916 改為「聯絡方式」(IG @帳號 / email 會自動轉超連結),欄位名未改
+  contact text default '',   -- 聯絡方式(IG @帳號 / email 會自動轉超連結)。原名 tags,d0ed916 改語意後正式環境已改名,2026-08-06 經 verify-schema.sql 核對確認
   created_at timestamptz default now()
 );
 
@@ -75,7 +74,7 @@ create table venue_apps (
   created_at timestamptz default now()
 );
 
--- 徵代打貼文。⚠️ 以下欄位由 src/App.jsx(SubCard / SubFormModal)與 api/remind-subs.js 反推,未經正式環境核對
+-- 徵代打貼文
 create table subs (
   id uuid primary key default gen_random_uuid(),
   song text not null,
@@ -93,7 +92,6 @@ create table subs (
 );
 
 -- 攝影:與 venues 同樣只能由管理者用 Supabase Table Editor 維護,App 內沒有新增/編輯介面
--- ⚠️ 以下欄位由 src/App.jsx 的攝影分頁反推,未經正式環境核對
 create table photography (
   id uuid primary key default gen_random_uuid(),
   name text not null,

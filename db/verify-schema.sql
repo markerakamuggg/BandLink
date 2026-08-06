@@ -79,7 +79,7 @@ with documented(table_name, column_name, data_type) as (values
     ('venues','name','text'),
     ('venues','note','text'),
     ('venues','price','text'),
-    ('venues','tags','text')
+    ('venues','contact','text')
 ),
 actual as (
   select table_name, column_name, data_type

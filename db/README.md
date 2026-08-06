@@ -17,8 +17,8 @@
 1. **`verify-schema.sql`** — 確認文件跟正式環境還對得上。
    看到「完全一致」就過關;有列出東西再去跑 `introspect.sql` 拿完整結構。
 
-   目前 `../supabase-schema.sql` 裡 `subs` 與 `photography` 兩張表的欄位是
-   **從程式碼反推的,從未核對過**,所以第一次跑很可能會報出差異,那是預期內的。
+   2026-08-06 已核對過一次:`subs`、`photography` 完全正確,`venues.tags` 實為
+   `venues.contact`,已修正。之後每次改結構後重跑即可。
 
 2. **`snapshot.sql`** — 一次拿到所有關鍵數字。不必先跑 migration,
    跟 `updated_at` 有關的那列會自動顯示「尚未啟用」。
