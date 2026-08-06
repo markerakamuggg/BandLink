@@ -1,8 +1,11 @@
 -- 團聚 BandLink 現況快照
--- 在 Supabase SQL Editor 貼上整份執行,只回傳「一張窄表」,整張複製貼回來就好。
 -- 純唯讀,不會改到任何資料。
 --
--- 這份是 metrics.sql 的濃縮版:同樣的問題,但壓成一次一張表,方便交換。
+-- 【怎麼用】
+--   1. Supabase 後台 → SQL Editor → 貼上整份 → 按 Run
+--   2. 結果只有「一格」。點那一格,Ctrl+C,整段貼回對話即可。
+--
+-- 這份是 metrics.sql 的濃縮版:同樣的問題,壓成一格,方便交換。
 -- 想看逐筆明細(社團名單、host 長相、每週趨勢)再去跑 metrics.sql。
 --
 -- 不必先跑 migration 也能用:與 updated_at 相關的指標會自動顯示「尚未啟用」。
@@ -91,4 +94,11 @@ m(ord, 分類, 指標, 數值) as (values
   (61, '編輯行為', '尚未認領的舊資料(會灌水上一列)',
        (select count(*)::text from edit_keys))
 )
-select 分類, 指標, 數值 from m order by ord;
+select
+  E'=== BandLink 現況快照 ===\n'
+  || now()::timestamp(0)::text || E'\n'
+  || E'(此快照由 db/snapshot.sql 產生,判讀注意事項見 db/README.md)\n\n'
+  -- 不做欄寬對齊:中文是全形字,rpad 按字數補位反而會歪掉
+  || string_agg('[' || 分類 || '] ' || 指標 || ' = ' || 數值, E'\n' order by ord)
+  as 現況快照
+from m;
