@@ -9,6 +9,8 @@
 | `introspect.sql` | 完整結構 dump(欄位、外鍵、RLS)。`verify-schema.sql` 報出問題時才需要 | 四張大表 | 否,純唯讀 |
 | `metrics.sql` | 逐項明細:社團名單、host 長相、每週趨勢、比對診斷 | 十五張表 | 否,純唯讀 |
 | `migrations/20260804_add_updated_at.sql` | 為 clubs / venues / events / subs 加上「最後修改時間」欄位與觸發器 | — | 會,但只新增欄位,不刪不覆寫 |
+| `dm-claim-list.sql` | 二次宣傳用:未認領社團/活動的 DM 名單,每則已代入認領碼 | **一格** | 否,純唯讀 |
+| `dm-school-gap.sql` | 二次宣傳用:雙北尚未加入名錄的高中(陌生開發名單) | **一格** | 否,純唯讀 |
 
 ## 建議順序
 
