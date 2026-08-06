@@ -18,7 +18,8 @@ create table clubs (
   intro text default '',
   contact text not null,
   created_at timestamptz default now(),
-  user_id uuid default auth.uid()
+  user_id uuid default auth.uid(),
+  updated_at timestamptz default now()   -- migrations/20260804_add_updated_at.sql
 );
 
 -- ⚠️ 已停用:App 已無任何程式碼讀寫 posts,功能由 subs(徵代打)取代。
@@ -45,7 +46,8 @@ create table events (
   descr text default '',
   created_at timestamptz default now(),
   contact text default '',
-  user_id uuid default auth.uid()
+  user_id uuid default auth.uid(),
+  updated_at timestamptz default now()   -- migrations/20260804_add_updated_at.sql
 );
 
 -- 場地:只能由管理者用 Supabase Table Editor 維護,App 內沒有新增/編輯介面
@@ -57,7 +59,8 @@ create table venues (
   price text default '',
   note text default '',
   contact text default '',   -- 聯絡方式(IG @帳號 / email 會自動轉超連結)。原名 tags,d0ed916 改語意後正式環境已改名,2026-08-06 經 verify-schema.sql 核對確認
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()   -- migrations/20260804_add_updated_at.sql
 );
 
 -- ⚠️ 已停用:場地/攝影已於 631300c 改為直接聯絡,申請流程與相關程式碼皆已移除。
@@ -88,7 +91,8 @@ create table subs (
   expires_at timestamptz,              -- 報名截止(選填)
   reminder_sent_at timestamptz,        -- 提醒信寄出時間,由 api/remind-subs.js 寫入
   created_at timestamptz default now(),
-  user_id uuid default auth.uid()
+  user_id uuid default auth.uid(),
+  updated_at timestamptz default now()   -- migrations/20260804_add_updated_at.sql
 );
 
 -- 攝影:與 venues 同樣只能由管理者用 Supabase Table Editor 維護,App 內沒有新增/編輯介面
@@ -146,6 +150,22 @@ create policy "subs 本人刪除" on subs for delete using (auth.uid() = user_id
 
 create policy "venue_apps 公開讀取" on venue_apps for select using (true);
 create policy "venue_apps 公開新增" on venue_apps for insert with check (true);
+
+-- 每次 UPDATE 自動記錄修改時間(migrations/20260804_add_updated_at.sql)
+create or replace function set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger set_updated_at before update on clubs  for each row execute function set_updated_at();
+create trigger set_updated_at before update on venues for each row execute function set_updated_at();
+create trigger set_updated_at before update on events for each row execute function set_updated_at();
+create trigger set_updated_at before update on subs   for each row execute function set_updated_at();
 
 -- 產生隨機編輯碼(格式 XXXX-XXXX)
 create or replace function _gen_code()

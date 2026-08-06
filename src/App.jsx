@@ -76,6 +76,16 @@ const fmtDate = d => (d ? String(d).slice(0, 10).replaceAll("-", "/") : "");
 
 // 活動日期已過即視為結束(當天仍算進行中)。sv 地區格式恰為 YYYY-MM-DD,可直接與 date 欄位字串比較
 const evEnded = ev => String(ev.date || "").slice(0, 10) < new Date().toLocaleDateString("sv");
+const subExpired = s => Boolean(s.expires_at) && new Date(s.expires_at) < new Date();
+
+// 收合區塊的開關列:預設收起,想看的人再點開
+const FoldToggle = ({ open, count, label, onToggle }) => (
+  <div style={{ textAlign: "center", margin: "2px 0 16px" }}>
+    <button onClick={onToggle} style={{ background: "none", border: `1px solid ${C.line}`, color: C.mute, borderRadius: 999, fontSize: 12, letterSpacing: 1, padding: "6px 16px", cursor: "pointer", fontFamily: "inherit" }}>
+      {open ? `▾ 收起${label}` : `▸ ${label}(${count})`}
+    </button>
+  </div>
+);
 
 const fmtDateTime = d => {
   if (!d) return "";
@@ -171,7 +181,7 @@ const TicketCard = ({ ev, onEdit }) => {
 };
 
 const SubCard = ({ s, onEdit }) => {
-  const expired = s.expires_at && new Date(s.expires_at) < new Date();
+  const expired = subExpired(s);
   return (
     <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, padding: "13px 15px", marginBottom: 10, opacity: expired ? .55 : 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
@@ -207,6 +217,8 @@ export default function App() {
   const [subFilter, setSubFilter] = useState("全部");
   const [eventsOpen, setEventsOpen] = useState(true);
   const [subsOpen, setSubsOpen] = useState(true);
+  const [endedOpen, setEndedOpen] = useState(false);         // 已結束演出,預設收起
+  const [expiredSubsOpen, setExpiredSubsOpen] = useState(false); // 已過期代打貼文,預設收起
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
@@ -295,9 +307,10 @@ export default function App() {
 
   const userName = session?.user?.user_metadata?.name || session?.user?.email || "";
 
-  // 進行中在前(日期近的先)、已結束墊底(剛結束的先);events 本身已按日期升冪
+  // 進行中在前(日期近的先);已結束預設收起(剛結束的先);events 本身已按日期升冪
   const upcomingEvents = events.filter(e => !evEnded(e));
   const endedEvents = events.filter(evEnded).reverse();
+  const activeSubs = subs.filter(s => !subExpired(s)); // 首頁精選只放未過期的
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.paper, fontFamily: "'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif", paddingBottom: 76 }}>
@@ -335,12 +348,13 @@ export default function App() {
             {events.length === 0 && <Empty text="還沒有活動——到「辦演出」建立第一場吧" />}
             {events.length > 0 && upcomingEvents.length === 0 && <Empty text="近期沒有活動——到「辦演出」發布下一場吧" />}
             {upcomingEvents.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
-            {endedEvents.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
+            {endedEvents.length > 0 && <FoldToggle open={endedOpen} count={endedEvents.length} label="已結束的演出" onToggle={() => setEndedOpen(o => !o)} />}
+            {endedOpen && endedEvents.map(e => <TicketCard key={e.id} ev={e} onEdit={isMine(e) ? () => setModal({ type: "editEvent", data: e }) : undefined} />)}
           </>)}
           <SectionTitle zh="最新徵代打" en="LATEST SUBS" collapsible open={subsOpen} onToggle={() => setSubsOpen(o => !o)} />
           {subsOpen && (<>
-            {subs.length === 0 && <Empty text="還沒有徵代打貼文" />}
-            {subs.slice(0, 3).map(s => <SubCard key={s.id} s={s} onEdit={isMine(s) ? () => setModal({ type: "editSub", data: s }) : undefined} />)}
+            {activeSubs.length === 0 && <Empty text="還沒有徵代打貼文" />}
+            {activeSubs.slice(0, 3).map(s => <SubCard key={s.id} s={s} onEdit={isMine(s) ? () => setModal({ type: "editSub", data: s }) : undefined} />)}
           </>)}
           <div style={{ textAlign: "center", margin: "6px 0 20px" }}>
             <Btn tone="ghost" onClick={() => setTab("subs")}>查看全部徵代打貼文 →</Btn>
@@ -379,9 +393,15 @@ export default function App() {
           <button onClick={() => requireLogin({ type: "claim" })} style={{ background: "none", border: "none", color: C.amber, fontSize: 12, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", padding: 0, margin: "0 0 12px" }}>以前用編輯碼發過內容?登入後在這裡認領 →</button>
           {(() => {
             const list = subFilter === "全部" ? subs : subs.filter(s => (s.tags || []).includes(subFilter));
-            return list.length === 0
-              ? <Empty text="還沒有徵代打貼文,發第一篇吧" />
-              : list.map(s => <SubCard key={s.id} s={s} onEdit={isMine(s) ? () => setModal({ type: "editSub", data: s }) : undefined} />);
+            const active = list.filter(s => !subExpired(s));
+            const expired = list.filter(subExpired);
+            return (<>
+              {list.length === 0 && <Empty text="還沒有徵代打貼文,發第一篇吧" />}
+              {list.length > 0 && active.length === 0 && <Empty text="目前沒有進行中的徵代打貼文" />}
+              {active.map(s => <SubCard key={s.id} s={s} onEdit={isMine(s) ? () => setModal({ type: "editSub", data: s }) : undefined} />)}
+              {expired.length > 0 && <FoldToggle open={expiredSubsOpen} count={expired.length} label="已過期的貼文" onToggle={() => setExpiredSubsOpen(o => !o)} />}
+              {expiredSubsOpen && expired.map(s => <SubCard key={s.id} s={s} onEdit={isMine(s) ? () => setModal({ type: "editSub", data: s }) : undefined} />)}
+            </>);
           })()}
         </>)}
 

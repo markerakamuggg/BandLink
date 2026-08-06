@@ -7,14 +7,15 @@
 --
 -- 期望看到「完全一致」。若列出差異,照貼即可,我會據此修正 supabase-schema.sql。
 --
--- 若已執行 20260804_add_updated_at.sql,clubs/venues/events/subs 會多出
--- updated_at,會被列為「實際有,文件沒寫」——那是預期內的,不是問題。
+-- 2026-08 起 updated_at 已納入文件(migration 已於正式環境執行)。
+-- 若這裡反而報 updated_at「文件有寫,實際不存在」,代表 migration 還沒跑。
 
 with documented(table_name, column_name, data_type) as (values
   ('clubs','area','text'),
     ('clubs','bands','integer'),
     ('clubs','contact','text'),
     ('clubs','created_at','timestamp with time zone'),
+    ('clubs','updated_at','timestamp with time zone'),
     ('clubs','genre','text'),
     ('clubs','id','uuid'),
     ('clubs','intro','text'),
@@ -26,6 +27,7 @@ with documented(table_name, column_name, data_type) as (values
     ('edit_keys','item_table','text'),
     ('events','contact','text'),
     ('events','created_at','timestamp with time zone'),
+    ('events','updated_at','timestamp with time zone'),
     ('events','date','date'),
     ('events','descr','text'),
     ('events','host','text'),
@@ -52,6 +54,7 @@ with documented(table_name, column_name, data_type) as (values
     ('posts','user_id','uuid'),
     ('subs','contact','text'),
     ('subs','created_at','timestamp with time zone'),
+    ('subs','updated_at','timestamp with time zone'),
     ('subs','event_clubs','text'),
     ('subs','event_name','text'),
     ('subs','event_time_place','text'),
@@ -75,6 +78,7 @@ with documented(table_name, column_name, data_type) as (values
     ('venues','area','text'),
     ('venues','cap','integer'),
     ('venues','created_at','timestamp with time zone'),
+    ('venues','updated_at','timestamp with time zone'),
     ('venues','id','uuid'),
     ('venues','name','text'),
     ('venues','note','text'),
