@@ -3,6 +3,10 @@
 --    不是要拿去重新執行的建置腳本。這個專案已經上線、已有真實社團/活動資料,
 --    整段重跑會建表失敗(表已存在)或砍掉正式資料——不要這樣做。
 --    用途:留底現況,以及之後要建全新環境(例如測試專案)時參考。
+--
+-- ✅ 2026-08-06 已以 db/verify-schema.sql 與正式環境完整核對:所有表、欄位、型別一致。
+--    之後改動資料庫結構時,請同步更新這份檔案與 db/verify-schema.sql 的 documented 清單,
+--    再跑一次 verify-schema.sql 確認。
 
 create table clubs (
   id uuid primary key default gen_random_uuid(),
@@ -14,9 +18,12 @@ create table clubs (
   intro text default '',
   contact text not null,
   created_at timestamptz default now(),
-  user_id uuid default auth.uid()
+  user_id uuid default auth.uid(),
+  updated_at timestamptz default now()   -- migrations/20260804_add_updated_at.sql
 );
 
+-- ⚠️ 已停用:App 已無任何程式碼讀寫 posts,功能由 subs(徵代打)取代。
+--    表仍存在於正式環境,保留以免動到既有資料。
 create table posts (
   id uuid primary key default gen_random_uuid(),
   kind text not null check (kind in ('徵團','自薦')),
@@ -39,7 +46,8 @@ create table events (
   descr text default '',
   created_at timestamptz default now(),
   contact text default '',
-  user_id uuid default auth.uid()
+  user_id uuid default auth.uid(),
+  updated_at timestamptz default now()   -- migrations/20260804_add_updated_at.sql
 );
 
 -- 場地:只能由管理者用 Supabase Table Editor 維護,App 內沒有新增/編輯介面
@@ -50,10 +58,13 @@ create table venues (
   cap int default 0,
   price text default '',
   note text default '',
-  tags text default '',
-  created_at timestamptz default now()
+  contact text default '',   -- 聯絡方式(IG @帳號 / email 會自動轉超連結)。原名 tags,d0ed916 改語意後正式環境已改名,2026-08-06 經 verify-schema.sql 核對確認
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()   -- migrations/20260804_add_updated_at.sql
 );
 
+-- ⚠️ 已停用:場地/攝影已於 631300c 改為直接聯絡,申請流程與相關程式碼皆已移除。
+--    表仍存在於正式環境,裡面的資料是舊制殘留,不會再有新增。
 create table venue_apps (
   id uuid primary key default gen_random_uuid(),
   venue text not null,
@@ -63,6 +74,35 @@ create table venue_apps (
   contact text not null,
   note text default '',
   state text default '審核中',
+  created_at timestamptz default now()
+);
+
+-- 徵代打貼文
+create table subs (
+  id uuid primary key default gen_random_uuid(),
+  song text not null,
+  tags text[] default '{}',            -- 複選標籤,App 端以陣列操作
+  event_name text not null,            -- 成發名稱
+  event_time_place text not null,      -- 時間地點(自由文字,例「8/23 12:30 西門河岸留言」)
+  event_clubs text default '',         -- 參加的社團(自由文字)
+  note text default '',
+  contact text not null,
+  filled boolean default false,        -- 已徵到人
+  expires_at timestamptz,              -- 報名截止(選填)
+  reminder_sent_at timestamptz,        -- 提醒信寄出時間,由 api/remind-subs.js 寫入
+  created_at timestamptz default now(),
+  user_id uuid default auth.uid(),
+  updated_at timestamptz default now()   -- migrations/20260804_add_updated_at.sql
+);
+
+-- 攝影:與 venues 同樣只能由管理者用 Supabase Table Editor 維護,App 內沒有新增/編輯介面
+create table photography (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  area text default '',
+  price text default '',
+  note text default '',                -- 內含 IG @帳號 / email 會被 App 自動轉為超連結
+  contact text default '',
   created_at timestamptz default now()
 );
 
@@ -81,6 +121,8 @@ alter table events enable row level security;
 alter table venues enable row level security;
 alter table venue_apps enable row level security;
 alter table edit_keys enable row level security;
+alter table subs enable row level security;
+alter table photography enable row level security;
 
 create policy "clubs 公開讀取" on clubs for select using (true);
 create policy "clubs 登入新增" on clubs for insert with check (auth.uid() = user_id);
@@ -99,8 +141,31 @@ create policy "events 本人刪除" on events for delete using (auth.uid() = use
 
 create policy "venues 公開讀取" on venues for select using (true);
 
+create policy "photography 公開讀取" on photography for select using (true);
+
+create policy "subs 公開讀取" on subs for select using (true);
+create policy "subs 登入新增" on subs for insert with check (auth.uid() = user_id);
+create policy "subs 本人修改" on subs for update using (auth.uid() = user_id);
+create policy "subs 本人刪除" on subs for delete using (auth.uid() = user_id);
+
 create policy "venue_apps 公開讀取" on venue_apps for select using (true);
 create policy "venue_apps 公開新增" on venue_apps for insert with check (true);
+
+-- 每次 UPDATE 自動記錄修改時間(migrations/20260804_add_updated_at.sql)
+create or replace function set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger set_updated_at before update on clubs  for each row execute function set_updated_at();
+create trigger set_updated_at before update on venues for each row execute function set_updated_at();
+create trigger set_updated_at before update on events for each row execute function set_updated_at();
+create trigger set_updated_at before update on subs   for each row execute function set_updated_at();
 
 -- 產生隨機編輯碼(格式 XXXX-XXXX)
 create or replace function _gen_code()
