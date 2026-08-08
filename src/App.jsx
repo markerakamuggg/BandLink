@@ -96,6 +96,12 @@ const fmtDateTime = d => {
 
 const igHandle = t => { const m = String(t || "").match(/@([A-Za-z0-9._]{2,30})/); return m ? m[1] : null; };
 const emailAddr = t => { const m = String(t || "").match(/[^\s@]+@[^\s@]+\.[^\s@]+/); return m ? m[0] : null; };
+// bare domain or full URL, e.g. "riverside.com.tw/livehouse" — venues usually
+// have only a website, no IG handle. TLD must be 2+ letters so "101號.B1" etc. won't match.
+const siteUrl = t => {
+  const m = String(t || "").match(/(?:https?:\/\/)?([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})(\/[^\s,、]*)?/);
+  return m ? `https://${m[1]}${m[2] || ""}` : null;
+};
 const contactHref = t => {
   // check email first: an email's domain (e.g. "@example.com") would otherwise
   // false-match the IG handle pattern, since "." is a valid handle character
@@ -103,7 +109,7 @@ const contactHref = t => {
   if (e) return `mailto:${e}`;
   const h = igHandle(t);
   if (h) return `https://www.instagram.com/${h}/`;
-  return null;
+  return siteUrl(t);
 };
 
 const IgChip = ({ from }) => {
@@ -416,7 +422,7 @@ export default function App() {
               </div>
               <div style={{ fontSize: 13, color: C.mute, lineHeight: 1.6, margin: "6px 0" }}><LinkifyNote text={v.note} /></div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-                <span style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>容納 {v.cap} 人・{v.price}</span>
+                <span style={{ fontFamily: "monospace", fontSize: 12, color: C.amber }}>{v.cap > 0 ? `容納 ${v.cap} 人・` : ""}{v.price}</span>
                 <ContactBtn contact={v.contact} />
               </div>
             </div>
