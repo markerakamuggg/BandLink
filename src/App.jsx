@@ -78,6 +78,81 @@ const fmtDate = d => (d ? String(d).slice(0, 10).replaceAll("-", "/") : "");
 const evEnded = ev => String(ev.date || "").slice(0, 10) < new Date().toLocaleDateString("sv");
 const subExpired = s => Boolean(s.expires_at) && new Date(s.expires_at) < new Date();
 
+const todayStr = () => new Date().toLocaleDateString("sv");           // YYYY-MM-DD
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const evDate = ev => String(ev.date || "").slice(0, 10);
+
+/* ── 演出月曆:哪幾天有場、哪幾天空著,一眼看完 ── */
+const EventCalendar = ({ events, onPick }) => {
+  const today = todayStr();
+  const [cursor, setCursor] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+
+  const byDate = {};
+  for (const e of events) { const k = evDate(e); if (k) (byDate[k] = byDate[k] || []).push(e); }
+
+  const year = cursor.getFullYear(), month = cursor.getMonth();
+  const first = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const lead = first.getDay();                                        // 0=日
+  const cells = [...Array(lead).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1))];
+  while (cells.length % 7) cells.push(null);
+
+  const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const monthCount = Object.entries(byDate).filter(([k]) => k.startsWith(monthKey)).reduce((n, [, v]) => n + v.length, 0);
+  const shift = n => setCursor(new Date(year, month + n, 1));
+
+  const navBtn = { background: "none", border: `1px solid ${C.line}`, color: C.paper, borderRadius: 4, cursor: "pointer", fontFamily: "inherit", fontSize: 14, padding: "2px 10px", lineHeight: 1.6 };
+
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, padding: "12px 12px 8px", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <button onClick={() => shift(-1)} style={navBtn} aria-label="上個月">‹</button>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontWeight: 900, fontSize: 15, letterSpacing: 1 }}>{year} 年 {month + 1} 月</div>
+          <div style={{ fontSize: 11, color: monthCount ? C.amber : C.mute }}>{monthCount ? `本月 ${monthCount} 場演出` : "本月尚無演出"}</div>
+        </div>
+        <button onClick={() => shift(1)} style={navBtn} aria-label="下個月">›</button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3, fontSize: 11, color: C.mute, textAlign: "center", marginBottom: 4 }}>
+        {["日", "一", "二", "三", "四", "五", "六"].map(d => <div key={d}>{d}</div>)}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const key = ymd(d);
+          const list = byDate[key] || [];
+          const isToday = key === today;
+          const past = key < today;
+          const has = list.length > 0;
+          return (
+            <button key={i} onClick={() => has && onPick({ date: key, list })} disabled={!has}
+              title={has ? list.map(e => e.title).join("、") : "這天沒有演出"}
+              style={{
+                aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+                background: has ? (past ? C.card2 : C.amber) : "transparent",
+                color: has && !past ? "#1A1115" : past ? C.mute : (isToday ? C.paper : C.mute),
+                border: isToday ? `1px solid ${C.pink}` : `1px solid ${has ? "transparent" : C.line}`,
+                borderRadius: 4, cursor: has ? "pointer" : "default", fontFamily: "inherit",
+                fontSize: 12, fontWeight: has ? 900 : 400, opacity: past && !has ? .4 : 1, padding: 0,
+              }}>
+              {d.getDate()}
+              {has && <span style={{ fontSize: 9, fontWeight: 700 }}>{list.length > 1 ? `${list.length} 場` : "●"}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", fontSize: 10, color: C.mute, marginTop: 8 }}>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.amber, borderRadius: 2, marginRight: 4 }} />有演出</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.card2, borderRadius: 2, marginRight: 4 }} />已結束</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, border: `1px solid ${C.line}`, borderRadius: 2, marginRight: 4 }} />這天沒人辦</span>
+      </div>
+    </div>
+  );
+};
+
 // 收合區塊的開關列:預設收起,想看的人再點開
 const FoldToggle = ({ open, count, label, onToggle }) => (
   <div style={{ textAlign: "center", margin: "2px 0 16px" }}>
@@ -223,6 +298,7 @@ export default function App() {
   const [subFilter, setSubFilter] = useState("全部");
   const [eventsOpen, setEventsOpen] = useState(true);
   const [subsOpen, setSubsOpen] = useState(true);
+  const [calOpen, setCalOpen] = useState(true);              // 演出月曆
   const [endedOpen, setEndedOpen] = useState(false);         // 已結束演出,預設收起
   const [expiredSubsOpen, setExpiredSubsOpen] = useState(false); // 已過期代打貼文,預設收起
   const [loading, setLoading] = useState(true);
@@ -349,6 +425,13 @@ export default function App() {
               已有 <span style={{ color: C.amber, fontWeight: 800 }}>{clubs.length}</span> 個社團加入團聚・目前 <span style={{ color: C.amber, fontWeight: 800 }}>{events.length}</span> 場表演登錄
             </div>
           )}
+          <SectionTitle zh="演出月曆" en="SHOW CALENDAR" collapsible open={calOpen} onToggle={() => setCalOpen(o => !o)} />
+          {calOpen && (
+            events.length === 0
+              ? <Empty text="還沒有活動——到「辦演出」建立第一場,月曆就會亮起來" />
+              : <EventCalendar events={events} onPick={d => setModal({ type: "day", data: d })} />
+          )}
+
           <SectionTitle zh="近期演出" en="UPCOMING SHOWS" collapsible open={eventsOpen} onToggle={() => setEventsOpen(o => !o)} />
           {eventsOpen && (<>
             {events.length === 0 && <Empty text="還沒有活動——到「辦演出」建立第一場吧" />}
@@ -470,6 +553,15 @@ export default function App() {
           <p style={{ fontSize: 14, lineHeight: 1.8, marginBottom: 16 }}>{modal.data.intro}</p>
           <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 6, padding: "12px 14px", marginBottom: 14 }}><ContactLine contact={modal.data.contact} /></div>
           {isMine(modal.data) && <Btn tone="ghost" style={{ width: "100%" }} onClick={() => setModal({ type: "editClub", data: modal.data })}>✎ 編輯社團資料</Btn>}
+        </Modal>
+      )}
+
+      {modal?.type === "day" && (
+        <Modal title={`${fmtDate(modal.data.date)} 的演出`} onClose={() => setModal(null)}>
+          {modal.data.list.map(e => (
+            <TicketCard key={e.id} ev={e}
+              onEdit={isMine(e) ? () => setModal({ type: "editEvent", data: e }) : undefined} />
+          ))}
         </Modal>
       )}
 
