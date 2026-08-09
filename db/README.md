@@ -9,6 +9,7 @@
 | `introspect.sql` | 完整結構 dump(欄位、外鍵、RLS)。`verify-schema.sql` 報出問題時才需要 | 四張大表 | 否,純唯讀 |
 | `metrics.sql` | 逐項明細:社團名單、host 長相、每週趨勢、比對診斷 | 十五張表 | 否,純唯讀 |
 | `migrations/20260804_add_updated_at.sql` | 為 clubs / venues / events / subs 加上「最後修改時間」欄位與觸發器 | — | 會,但只新增欄位,不刪不覆寫 |
+| `health-check.sql` | 找出會讓統計失真的髒資料(孤兒認領碼、無主無碼、同名社團等) | **一格** | 否,純唯讀 |
 | `dm-claim-list.sql` | 二次宣傳用:未認領社團/活動的 DM 名單,每則已代入認領碼 | **一格** | 否,純唯讀 |
 | `dm-school-gap.sql` | 二次宣傳用:雙北尚未加入名錄的高中(陌生開發名單) | **一格** | 否,純唯讀 |
 
@@ -22,15 +23,22 @@
    2026-08-06 已核對過一次:`subs`、`photography` 完全正確,`venues.tags` 實為
    `venues.contact`,已修正。之後每次改結構後重跑即可。
 
-2. **`snapshot.sql`** — 一次拿到所有關鍵數字。不必先跑 migration,
+2. **`health-check.sql`** — 先確認數字是乾淨的,再去看數字。
+
+   2026-08-08 靠它發現 `edit_keys` 有 16 筆認領碼指向已被刪除的 clubs/events,
+   讓「未認領筆數」從實際的 21 虛報成 37,差了將近一倍。單看某張表的
+   `count(*)` 看不出這種問題,要交叉比對才會現形。孤兒碼已清除,
+   還原檔留在 `backup/20260808_orphan_edit_keys.sql`。
+
+3. **`snapshot.sql`** — 一次拿到所有關鍵數字。不必先跑 migration,
    跟 `updated_at` 有關的那列會自動顯示「尚未啟用」。
 
 這兩份都刻意設計成**只回傳一格**:點那一格、Ctrl+C、貼回來就好,
 不必框選表格。SQL Editor 的表格結果複製起來容易漏欄或跑版。
 
-3. 想深入看某一項(哪些社團、host 到底怎麼寫的、每週趨勢)再跑 `metrics.sql`。
+4. 想深入看某一項(哪些社團、host 到底怎麼寫的、每週趨勢)再跑 `metrics.sql`。
 
-4. 想要「有沒有回來維護內容」這個指標,跑 `migrations/20260804_add_updated_at.sql`。
+5. 想要「有沒有回來維護內容」這個指標,跑 `migrations/20260804_add_updated_at.sql`。
    跑完之後 `verify-schema.sql` 會多報四列 `updated_at`「實際有,文件沒寫」,
    那是正常的,不是問題。
 

@@ -78,6 +78,21 @@ const fmtDate = d => (d ? String(d).slice(0, 10).replaceAll("-", "/") : "");
 const evEnded = ev => String(ev.date || "").slice(0, 10) < new Date().toLocaleDateString("sv");
 const subExpired = s => Boolean(s.expires_at) && new Date(s.expires_at) < new Date();
 
+// area 是自由文字(「台北」「新北市 林口」「基隆」都有人填),無法精確比對,
+// 因此只粗分縣市。先判斷新北,否則「新北」會被「北」的規則誤收。
+const CITIES = ["全部", "台北", "新北", "其他"];
+const cityOf = area => {
+  const a = String(area || "");
+  if (/新北/.test(a)) return "新北";
+  if (/台北|臺北|北市/.test(a)) return "台北";
+  return "其他";
+};
+const matchClub = (c, q) => {
+  const s = q.trim().toLowerCase();
+  if (!s) return true;
+  return [c.name, c.area, c.intro, c.contact].some(v => String(v || "").toLowerCase().includes(s));
+};
+
 const todayStr = () => new Date().toLocaleDateString("sv");           // YYYY-MM-DD
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const evDate = ev => String(ev.date || "").slice(0, 10);
@@ -98,7 +113,9 @@ const EventCalendar = ({ events, onPick }) => {
   while (cells.length % 7) cells.push(null);
 
   const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
-  const monthCount = Object.entries(byDate).filter(([k]) => k.startsWith(monthKey)).reduce((n, [, v]) => n + v.length, 0);
+  const monthList = events.filter(e => evDate(e).startsWith(monthKey))
+                          .sort((a, b) => evDate(a).localeCompare(evDate(b)));
+  const monthCount = monthList.length;
   const shift = n => setCursor(new Date(year, month + n, 1));
 
   const navBtn = { background: "none", border: `1px solid ${C.line}`, color: C.paper, borderRadius: 4, cursor: "pointer", fontFamily: "inherit", fontSize: 14, padding: "2px 10px", lineHeight: 1.6 };
@@ -149,6 +166,27 @@ const EventCalendar = ({ events, onPick }) => {
         <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.card2, borderRadius: 2, marginRight: 4 }} />已結束</span>
         <span><span style={{ display: "inline-block", width: 8, height: 8, border: `1px solid ${C.line}`, borderRadius: 2, marginRight: 4 }} />這天沒人辦</span>
       </div>
+
+      {/* 當月演出清單:格子塞不下完整標題,列在下面才看得到是哪一場 */}
+      {monthList.length > 0 && (
+        <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 10, paddingTop: 8 }}>
+          {monthList.map(e => {
+            const past = evDate(e) < today;
+            return (
+              <button key={e.id} onClick={() => onPick({ date: evDate(e), list: byDate[evDate(e)] })}
+                style={{ display: "flex", alignItems: "baseline", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", borderRadius: 4, padding: "5px 4px", cursor: "pointer", fontFamily: "inherit", opacity: past ? .5 : 1 }}>
+                <span style={{ fontFamily: "monospace", fontSize: 11, color: past ? C.mute : C.amber, whiteSpace: "nowrap", fontWeight: 700 }}>
+                  {String(Number(evDate(e).slice(8, 10)))}日
+                </span>
+                <span style={{ fontSize: 12, color: C.paper, lineHeight: 1.5, flex: 1, minWidth: 0 }}>
+                  {e.title}
+                  {e.venue && <span style={{ color: C.mute }}>・{e.venue}</span>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
@@ -299,6 +337,8 @@ export default function App() {
   const [eventsOpen, setEventsOpen] = useState(true);
   const [subsOpen, setSubsOpen] = useState(true);
   const [calOpen, setCalOpen] = useState(true);              // 演出月曆
+  const [clubQuery, setClubQuery] = useState("");            // 社團搜尋字串
+  const [clubCity, setClubCity] = useState("全部");           // 社團地區篩選
   const [endedOpen, setEndedOpen] = useState(false);         // 已結束演出,預設收起
   const [expiredSubsOpen, setExpiredSubsOpen] = useState(false); // 已過期代打貼文,預設收起
   const [loading, setLoading] = useState(true);
@@ -393,6 +433,7 @@ export default function App() {
   const upcomingEvents = events.filter(e => !evEnded(e));
   const endedEvents = events.filter(evEnded).reverse();
   const activeSubs = subs.filter(s => !subExpired(s)); // 首頁精選只放未過期的
+  const shownClubs = clubs.filter(c => matchClub(c, clubQuery) && (clubCity === "全部" || cityOf(c.area) === clubCity));
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.paper, fontFamily: "'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif", paddingBottom: 76 }}>
@@ -455,7 +496,37 @@ export default function App() {
             <SectionTitle zh="社團名錄" en="CLUB DIRECTORY" />
             <Btn onClick={() => requireLogin({ type: "newClub" })}>＋ 登錄社團</Btn>
           </div>
-          {clubs.map(c => (
+
+          <input value={clubQuery} onChange={e => setClubQuery(e.target.value)}
+            placeholder="搜尋社團名稱、地區…"
+            style={{ ...inputStyle, marginBottom: 10 }} />
+
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+            {CITIES.map(city => {
+              const on = clubCity === city;
+              const n = city === "全部" ? clubs.length : clubs.filter(c => cityOf(c.area) === city).length;
+              if (n === 0 && city !== "全部") return null;
+              return (
+                <button key={city} onClick={() => setClubCity(city)} style={{
+                  fontSize: 12, fontWeight: 700, fontFamily: "inherit", borderRadius: 999, padding: "4px 12px", cursor: "pointer",
+                  color: on ? "#1A1115" : C.mute, background: on ? C.amber : "transparent", border: `1px solid ${on ? C.amber : C.line}`,
+                }}>{city} {n}</button>
+              );
+            })}
+            {(clubQuery || clubCity !== "全部") && (
+              <button onClick={() => { setClubQuery(""); setClubCity("全部"); }}
+                style={{ fontSize: 12, fontFamily: "inherit", background: "none", border: "none", color: C.mute, textDecoration: "underline", cursor: "pointer" }}>清除</button>
+            )}
+          </div>
+
+          {shownClubs.length === 0 && (
+            <Empty text={clubs.length === 0 ? "還沒有社團登錄" : `找不到符合「${clubQuery || clubCity}」的社團`} />
+          )}
+          {shownClubs.length > 0 && (clubQuery || clubCity !== "全部") && (
+            <div style={{ fontSize: 12, color: C.mute, margin: "0 0 8px 2px" }}>找到 {shownClubs.length} 個社團</div>
+          )}
+
+          {shownClubs.map(c => (
             <div key={c.id} onClick={() => setModal({ type: "club", data: c })} style={{ background: C.card, border: `1px solid ${C.line}`, borderLeft: `3px solid ${C.amber}`, borderRadius: 6, padding: "13px 15px", marginBottom: 10, cursor: "pointer" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
