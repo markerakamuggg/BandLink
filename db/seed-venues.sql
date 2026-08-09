@@ -41,6 +41,12 @@ with seed(name, area, cap, price, note, contact) as (values
   ('Legacy Taipei', '台北・中正(華山1914文創園區)', 1200, '包場費請洽場地',
    '大型場館,多校聯合成發等級,費用高、檔期競爭激烈。',
    'legacy.com.tw'),
+  ('角落文創展演空間 Corner House', '台北・南港(忠孝東路六段21號1樓)', 500, '包場費請洽場地',
+   '站席約 500、座席約 250。捷運後山埤站 4 號出口,遠雄金融廣場玉成街口。場地規格接近正式演唱會等級,適合多校聯合成發或規模較大的獨立成發。電話 02-2653-0788,售票多在 KKTIX。',
+   'corner-house.com.tw'),
+  ('凝聚力音樂娛樂 Cohesion', '台北・松山(八德路三段106巷1號 B1)', 120, '場租請洽場地',
+   '小巨蛋捷運站步行約 7 分鐘。2015 年成立、2018 年遷至現址,以展演空間、影音製作、人才培育為主。有社團在這裡辦過成發,是團聚上實際被使用過的場地。電話 02-2570-0025,另有 LINE 官方帳號 @710zopjy。',
+   '@chmetw'),
   ('狀態音樂 State Music', '新北・板橋(中山路二段101號 B1)', 0, '場租請洽場地',
    '板橋的音樂綜合基地,一個地方同時有練團室(二四練團室)、展演空間(FuzzArtSpace)與彩排室,另有樂器販售、音響工程與錄音。對新北的社團來說是少見的在地選擇——平常練團、成發演出可以在同一個場地解決,不用每次都跨區到台北。營業時間週一至五 14:00-23:00、週六日 12:00-23:00,可刷卡與 LINE Pay。另有 LINE 官方帳號可洽詢。',
    '@state_music'),
@@ -63,5 +69,5 @@ select s.name, s.area, s.cap, s.price, s.note, s.contact
 from seed s
 where not exists (select 1 from venues x where x.name = s.name);
 
--- 3. 跑完看一眼結果(應為 9 筆,狀態音樂的 cap 為 0 代表容量未知)
+-- 3. 跑完看一眼結果(應為 11 筆,狀態音樂的 cap 為 0 代表容量未知)
 select name, area, cap, contact from venues order by area, name;
